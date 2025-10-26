@@ -1,0 +1,9 @@
+.env
+cache/
+*.pyc
+__pycache__/
+.DS_Store
+*.log
+recommendations*.md
+recommendations*.json
+recommendations_visualisation.html
