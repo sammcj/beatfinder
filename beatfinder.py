@@ -1146,7 +1146,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
                     <td>{rarity:.3f}</td>
                     <td class="recommenders">{recommenders_text}</td>
                     <td class="tags">{tags_html}</td>
-                    <td><a href="{search_url}" target="_blank" class="link">🎵 Search</a></td>
+                    <td><a href="{search_url}" class="link">🎵 Search</a></td>
                 </tr>"""
 
     # Generate HTML with embedded vis.js
@@ -1542,7 +1542,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
                             <div class="modal-section-title">About</div>
                             <p>This artist is in your loved artists collection and contributed to these recommendations.</p>
                         </div>
-                        <a href="${{searchUrl}}" target="_blank" class="modal-button">🎵 Search in Apple Music</a>
+                        <a href="${{searchUrl}}" class="modal-button">🎵 Search in Apple Music</a>
                     `;
                 }} else if (node.group === 'recommended') {{
                     // Show info for recommended artist
@@ -1580,7 +1580,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
                                 ${{tagsHtml}}
                             </div>
                         </div>
-                        <a href="${{searchUrl}}" target="_blank" class="modal-button">🎵 Search in Apple Music</a>
+                        <a href="${{searchUrl}}" class="modal-button">🎵 Search in Apple Music</a>
                     `;
                 }}
 
