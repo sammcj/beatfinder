@@ -22,6 +22,7 @@ Discover new artists based on your Apple Music library using Last.fm's recommend
 ## Requirements
 
 - macOS with Apple Music/Music.app
+  - Export of your library XML (File → Library → Export Library...)
 - Python 3.9+
 - Last.fm API key (free)
 
