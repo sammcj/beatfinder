@@ -857,7 +857,7 @@ def format_recommendations(recommendations: List[Dict], limit: int) -> str:
             output.append(f"\n**Tags:** {', '.join(rec['tags'][:8])}\n")
 
         # Apple Music search link
-        search_url = f"https://music.apple.com/search?term={rec['name'].replace(' ', '+')}"
+        search_url = f"music://music.apple.com/search?term={rec['name'].replace(' ', '+')}"
         output.append(f"\n[Search in Apple Music]({search_url})\n")
         output.append("\n---\n")
 
@@ -1127,7 +1127,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
         recommenders = rec["recommended_by"][:5]  # Top 5 recommenders
 
         # Apple Music search link
-        search_url = f"https://music.apple.com/search?term={artist_name.replace(' ', '+')}"
+        search_url = f"music://music.apple.com/search?term={artist_name.replace(' ', '+')}"
 
         # Format tags
         tags_html = " ".join([f'<span class="tag">{tag}</span>' for tag in tags])
@@ -1532,7 +1532,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
 
                 if (node.group === 'loved') {{
                     // Show info for loved artist
-                    const searchUrl = `https://music.apple.com/search?term=${{encodeURIComponent(node.label)}}`;
+                    const searchUrl = `music://music.apple.com/search?term=${{encodeURIComponent(node.label)}}`;
                     modalContent = `
                         <div class="modal-header">
                             <h2 class="modal-title">${{node.label}}</h2>
@@ -1547,7 +1547,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
                 }} else if (node.group === 'recommended') {{
                     // Show info for recommended artist
                     const data = node.data;
-                    const searchUrl = `https://music.apple.com/search?term=${{encodeURIComponent(node.label)}}`;
+                    const searchUrl = `music://music.apple.com/search?term=${{encodeURIComponent(node.label)}}`;
 
                     const tagsHtml = data.tags.map(tag => `<span class="modal-tag">${{tag}}</span>`).join('');
                     const recommendersHtml = data.recommended_by.map(r => `<li>${{r}}</li>`).join('');
