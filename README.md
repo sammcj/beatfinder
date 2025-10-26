@@ -2,6 +2,8 @@
 
 Discover new artists based on your Apple Music library using Last.fm's recommendation engine.
 
+![Screenshot](screenshots/screenshot-2025-10-27.png)
+
 ## Features
 
 - Extracts your Apple Music library data from XML export (artists, play counts, loved status, play dates)
