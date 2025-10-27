@@ -160,10 +160,23 @@ All settings in `.env` (copy from `.env.example`):
 - Shows progress every 10,000 tracks
 - Star ratings stored as 0-100 (multiply by 20: 4 stars = 80)
 
-### AppleScript Integration
-- `create_apple_music_playlist()` uses AppleScript to create playlists
-- `test_library.py` uses AppleScript for direct library access (alternative to XML)
-- Requires macOS Music.app permissions
+### Apple Music Web API Integration
+
+**Why this approach exists:**
+- Apple's official MusicKit API requires paid Apple Developer subscription
+- This uses browser-extracted tokens to bypass subscription requirement
+- Tokens extracted from https://music.apple.com when logged in
+
+**Token sources & expiry** (critical for playlist creation):
+- `APPLE_MUSIC_WEB_DEV_TOKEN`: JWT found in URL params/network requests (~6 month expiry)
+- `APPLE_MUSIC_WEB_MEDIA_USER_TOKEN`: Found in browser cookies/storage (~weeks expiry)
+- When expired, user must manually re-extract from browser - no automatic refresh
+
+**Non-obvious behaviours:**
+- Playlist changes may take 1-3 minutes to update in Apple Music UI (API succeeds immediately but UI lags)
+- Library filtering uses equivalents API to detect songs user already has (prevents duplicate adds)
+- Regional availability: 500 errors trigger automatic equivalent lookup for user's region
+- Country code hardcoded to 'au' (Australia) - change `COUNTRY_CODE` in `apple_music_web_api.py` if needed
 
 ### Artist Name Normalisation
 - `_normalise_artist_name()` handles quote variations and spacing
@@ -178,4 +191,21 @@ All settings in `.env` (copy from `.env.example`):
 
 - `requests`: HTTP library for Last.fm API
 - `python-dotenv`: Environment variable management
-- Standard library: `plistlib`, `threading`, `concurrent.futures`, `subprocess`
+- `playwright`: Browser automation for Apple Music scraping
+- `urllib3`: HTTP client for Apple Music web API
+- Standard library: `plistlib`, `threading`, `concurrent.futures`, `subprocess`, `json`, `pathlib`
+
+## Non-Obvious Design Decisions & Gotchas
+
+### Why Playwright for Scraping
+- Apple Music catalogue has no public API for song search
+- Web scraping is the only way to get song IDs without Apple Developer subscription
+- Playwright scraper clicks first artist result - can match wrong artist if name is ambiguous
+
+### Cache Invalidation Rules
+- Changing `RARITY_PREFERENCE` in `.env` automatically invalidates recommendations cache
+- This is intentional: rarity affects scoring, so cached recommendations become stale
+
+### Star Ratings Format
+- Apple Music XML stores ratings as 0-100 integers (4 stars = 80)
+- Code divides by 20 to get 1-5 scale - don't change this or loved artist detection breaks

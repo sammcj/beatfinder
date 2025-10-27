@@ -7,9 +7,11 @@ Creates playlists directly in Apple Music using the web API.
 import json
 import os
 import urllib3
+import threading
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 load_dotenv()
@@ -49,6 +51,7 @@ class AppleMusicWebAPI:
         }
 
         self.http = urllib3.PoolManager()
+        self.stats_lock = threading.Lock()  # Thread-safe counters
 
     def get_all_playlists(self) -> List[Dict]:
         """
@@ -351,16 +354,11 @@ class AppleMusicWebAPI:
                 print("All songs are already in your library - nothing to add!")
                 return playlist_id
 
-            print(f"\nAdding {len(songs_to_add)} new songs to playlist...")
-            print(f"Verbose mode enabled - showing detailed results:\n")
-            successful = 0
-            failed = 0
+            print(f"\nAdding {len(songs_to_add)} new songs to playlist in parallel...")
+            print(f"Using 5 concurrent workers for faster processing\n")
 
-            for i, song_id in enumerate(songs_to_add, 1):
-                if self.add_song_to_playlist(playlist_id, song_id, verbose=True):
-                    successful += 1
-                else:
-                    failed += 1
+            # Add songs in parallel
+            successful, failed = self._add_songs_parallel(playlist_id, songs_to_add, max_workers=5)
 
             print(f"\n✓ Added {successful}/{len(songs_to_add)} songs successfully")
             if failed > 0:
@@ -369,6 +367,60 @@ class AppleMusicWebAPI:
                 print(f"  {already_in_library} songs skipped (already in library)")
 
         return playlist_id
+
+    def _add_songs_parallel(
+        self,
+        playlist_id: str,
+        song_ids: List[str],
+        max_workers: int = 5
+    ) -> Tuple[int, int]:
+        """
+        Add multiple songs to playlist in parallel.
+
+        Args:
+            playlist_id: Playlist ID
+            song_ids: List of song IDs to add
+            max_workers: Number of concurrent workers
+
+        Returns:
+            Tuple of (successful_count, failed_count)
+        """
+        successful = 0
+        failed = 0
+        completed = 0
+        total = len(song_ids)
+
+        def add_song_worker(song_id: str) -> bool:
+            """Worker function to add a single song"""
+            return self.add_song_to_playlist(playlist_id, song_id, verbose=False)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_song = {
+                executor.submit(add_song_worker, song_id): song_id
+                for song_id in song_ids
+            }
+
+            # Process results as they complete
+            for future in as_completed(future_to_song):
+                song_id = future_to_song[future]
+                completed += 1
+
+                try:
+                    result = future.result()
+                    with self.stats_lock:
+                        if result:
+                            successful += 1
+                            print(f"  [{completed}/{total}] Song {song_id}: ✓")
+                        else:
+                            failed += 1
+                            print(f"  [{completed}/{total}] Song {song_id}: ✗ failed")
+                except Exception as e:
+                    with self.stats_lock:
+                        failed += 1
+                        print(f"  [{completed}/{total}] Song {song_id}: ✗ error - {e}")
+
+        return successful, failed
 
 
 def create_beatfinder_playlist(artist_song_data: Dict[str, Dict]) -> Optional[str]:
