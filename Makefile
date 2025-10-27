@@ -17,6 +17,7 @@ setup:
 
 install:
 	pip3 install -r requirements.txt
+	playwright install chromium
 
 run:
 	python3 beatfinder.py
