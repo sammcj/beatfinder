@@ -75,7 +75,7 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-10)
 
 ### Caching System
 
-**Two-tier cache architecture**:
+**Multi-tier cache architecture**:
 
 1. **Last.fm API cache** (`cache/lastfm_cache.json`)
    - Caches all API responses (similar artists, tags, artist info)
@@ -91,6 +91,12 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-10)
 3. **Library cache** (`cache/library_cache.json`)
    - Caches parsed Apple Music library XML
    - Cleared with `--scan-library`
+
+4. **Apple Music scrape cache** (`cache/apple_music_scrape_cache.json`)
+   - Caches scraped song IDs and URLs from Apple Music catalogue
+   - Expiry: 7 days
+   - Avoids re-scraping artists on subsequent runs
+   - Automatically updated when new artists are scraped
 
 ### Scoring Algorithm
 

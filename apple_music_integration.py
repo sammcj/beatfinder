@@ -5,8 +5,61 @@ Apple Music integration: scrape song links from catalogue
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict
+from typing import List, Dict, Optional
+from pathlib import Path
+from datetime import datetime, timedelta
 import re
+import json
+
+
+# Cache settings
+APPLE_MUSIC_CACHE_FILE = Path("cache/apple_music_scrape_cache.json")
+APPLE_MUSIC_CACHE_EXPIRY_DAYS = 7  # Re-scrape after 7 days
+
+
+def load_scrape_cache() -> Dict[str, Dict]:
+    """
+    Load cached Apple Music scraping results.
+
+    Returns:
+        Dict mapping artist names to their scraped data with metadata
+        Format: {
+            'artist_name': {
+                'data': {'artist_url': '...', 'songs': [...]},
+                'cached_at': '2025-10-28T10:30:00',
+                'cache_version': 1
+            }
+        }
+    """
+    if not APPLE_MUSIC_CACHE_FILE.exists():
+        return {}
+
+    try:
+        with open(APPLE_MUSIC_CACHE_FILE, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load Apple Music cache: {e}")
+        return {}
+
+
+def save_scrape_cache(cache_data: Dict[str, Dict]):
+    """Save Apple Music scraping cache to disk"""
+    APPLE_MUSIC_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(APPLE_MUSIC_CACHE_FILE, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Could not save Apple Music cache: {e}")
+
+
+def is_cache_entry_valid(cache_entry: Dict) -> bool:
+    """Check if a cache entry is still valid (not expired)"""
+    try:
+        cached_at = datetime.fromisoformat(cache_entry.get('cached_at', ''))
+        age = datetime.now() - cached_at
+        return age < timedelta(days=APPLE_MUSIC_CACHE_EXPIRY_DAYS)
+    except Exception:
+        return False
 
 
 class AppleMusicScraper:
@@ -154,7 +207,7 @@ class AppleMusicScraper:
 
 def scrape_artists_parallel(artist_names: List[str], max_songs: int = 3, batch_size: int = 5) -> Dict[str, Dict]:
     """
-    Scrape multiple artists in parallel batches
+    Scrape multiple artists in parallel batches with caching.
 
     Args:
         artist_names: List of artist names to search
@@ -164,15 +217,39 @@ def scrape_artists_parallel(artist_names: List[str], max_songs: int = 3, batch_s
     Returns:
         Dict mapping artist names to their song data
     """
+    # Load cache
+    cache = load_scrape_cache()
     results = {}
+    artists_to_scrape = []
+    cached_count = 0
+
+    # Check cache for each artist
+    for artist in artist_names:
+        cache_entry = cache.get(artist)
+        if cache_entry and is_cache_entry_valid(cache_entry):
+            # Use cached data
+            results[artist] = cache_entry['data']
+            cached_count += 1
+        else:
+            # Need to scrape
+            artists_to_scrape.append(artist)
+
     total_artists = len(artist_names)
+    print(f"  ✓ Using cached data for {cached_count}/{total_artists} artists")
+
+    if not artists_to_scrape:
+        print(f"  All artists cached - no scraping needed!\n")
+        return results
+
+    print(f"  Scraping {len(artists_to_scrape)} new/expired artists...\n")
+
     completed = 0
 
     # Process in batches to avoid too many concurrent browsers
-    for i in range(0, len(artist_names), batch_size):
-        batch = artist_names[i:i + batch_size]
+    for i in range(0, len(artists_to_scrape), batch_size):
+        batch = artists_to_scrape[i:i + batch_size]
         batch_num = (i // batch_size) + 1
-        total_batches = (total_artists + batch_size - 1) // batch_size
+        total_batches = (len(artists_to_scrape) + batch_size - 1) // batch_size
 
         print(f"  Batch {batch_num}/{total_batches}: Scraping {len(batch)} artists...")
 
@@ -192,10 +269,20 @@ def scrape_artists_parallel(artist_names: List[str], max_songs: int = 3, batch_s
                     results[artist] = data
                     songs_found = len(data.get('songs', []))
                     status = f"✓ {songs_found} songs" if songs_found > 0 else "✗ no songs"
-                    print(f"    [{completed}/{total_artists}] {artist}: {status}")
+                    print(f"    [{completed}/{len(artists_to_scrape)}] {artist}: {status}")
+
+                    # Update cache
+                    cache[artist] = {
+                        'data': data,
+                        'cached_at': datetime.now().isoformat(),
+                        'cache_version': 1
+                    }
                 except Exception as e:
-                    print(f"    [{completed}/{total_artists}] {artist}: ✗ error - {e}")
+                    print(f"    [{completed}/{len(artists_to_scrape)}] {artist}: ✗ error - {e}")
                     results[artist] = {'artist_url': None, 'songs': []}
+
+    # Save updated cache
+    save_scrape_cache(cache)
 
     return results
 
