@@ -127,7 +127,7 @@ All settings in `.env` (copy from `.env.example`):
 
 ### Key Settings
 - `MAX_RECOMMENDATIONS`: Number of recommendations (default: 15)
-- `RARITY_PREFERENCE`: 1 (popular) to 10 (obscure), default: 7
+- `RARITY_PREFERENCE`: 1 (popular) to 15 (very obscure), default: 7
 - `KNOWN_ARTIST_MIN_PLAY_COUNT`: Threshold for filtering known artists (default: 3)
 - `KNOWN_ARTIST_MIN_TRACKS`: Track count threshold for known artists (default: 5)
 

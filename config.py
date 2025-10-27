@@ -32,8 +32,8 @@ RECOMMENDATIONS_CACHE_EXPIRY_DAYS = int(os.getenv("RECOMMENDATIONS_CACHE_EXPIRY_
 RARITY_PREFERENCE = int(os.getenv("RARITY_PREFERENCE", "7"))
 
 # Validate rarity preference
-if not 1 <= RARITY_PREFERENCE <= 10:
-    print(f"Warning: RARITY_PREFERENCE={RARITY_PREFERENCE} is out of range (1-10). Using default: 7")
+if not 1 <= RARITY_PREFERENCE <= 15:
+    print(f"Warning: RARITY_PREFERENCE={RARITY_PREFERENCE} is out of range (1-15). Using default: 7")
     RARITY_PREFERENCE = 7
 
 # Performance settings

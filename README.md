@@ -116,7 +116,7 @@ python beatfinder.py --limit 20
 
 ### Change rarity preference:
 ```bash
-python beatfinder.py --rarity 9  # 1 (most popular) to 10 (most obscure)
+python beatfinder.py --rarity 12  # 1 (most popular) to 15 (most obscure)
 ```
 
 ## Output
@@ -134,7 +134,10 @@ Edit `.env` to customise:
 
 ### Basic Settings
 - `MAX_RECOMMENDATIONS` - Number of artists to recommend (default: 15)
-- `RARITY_PREFERENCE` - Scale from 1 (most popular) to 10 (most obscure), default: 7
+- `RARITY_PREFERENCE` - Scale from 1 (most popular) to 15 (most obscure), default: 7
+  - 1-5: Mainstream artists with large followings
+  - 6-10: Balance between popular and obscure
+  - 11-15: Very obscure/underground artists with small listener counts
 
 ### Artist Classification
 

@@ -642,8 +642,8 @@ def main():
     parser.add_argument("--refresh-all", action="store_true", help="Clear all caches (Last.fm + recommendations)")
     parser.add_argument("--regenerate-html", action="store_true", help="Regenerate HTML visualisation from cached recommendations")
     parser.add_argument("--limit", type=int, default=MAX_RECOMMENDATIONS, help="Number of recommendations")
-    parser.add_argument("--rarity", type=int, choices=range(1, 11), default=RARITY_PREFERENCE,
-                       help="Rarity preference: 1 (most popular) to 10 (most obscure), default: 7")
+    parser.add_argument("--rarity", type=int, choices=range(1, 16), default=RARITY_PREFERENCE,
+                       help="Rarity preference: 1 (most popular) to 15 (most obscure), default: 7")
     args = parser.parse_args()
 
     # Validate API key

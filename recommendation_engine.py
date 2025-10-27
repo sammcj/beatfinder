@@ -412,8 +412,13 @@ class RecommendationEngine:
                     (rarity_score * SCORING_RARITY_WEIGHT)
                 )
             else:
-                rarity_weight = 0.1 + (rarity_pref - 1) * 0.3 / 9
-                frequency_weight = 0.5 - (rarity_pref - 1) * 0.1 / 9
+                # Extended rarity scale: 1-15
+                # At 1: rarity=0.1, frequency=0.5, match=0.4 (popular)
+                # At 7: rarity=0.227, frequency=0.443, match=0.330 (balanced)
+                # At 10: rarity=0.325, frequency=0.410, match=0.265 (obscure)
+                # At 15: rarity=0.5, frequency=0.350, match=0.150 (very obscure)
+                rarity_weight = 0.1 + (rarity_pref - 1) * 0.4 / 14
+                frequency_weight = 0.5 - (rarity_pref - 1) * 0.15 / 14
                 match_weight = 1.0 - rarity_weight - frequency_weight
                 score = (frequency_score * frequency_weight) + (avg_match * match_weight) + (rarity_score * rarity_weight)
 
@@ -449,8 +454,9 @@ class RecommendationEngine:
                     )
                 else:
                     pref = rec["rarity_pref"]
-                    rarity_weight = 0.1 + (pref - 1) * 0.3 / 9
-                    frequency_weight = 0.5 - (pref - 1) * 0.1 / 9
+                    # Extended rarity scale: 1-15
+                    rarity_weight = 0.1 + (pref - 1) * 0.4 / 14
+                    frequency_weight = 0.5 - (pref - 1) * 0.15 / 14
                     match_weight = 1.0 - rarity_weight - frequency_weight
                     rec["score"] = (rec["frequency"] * frequency_weight) + (rec["avg_match"] * match_weight) + (rec["rarity_score"] * rarity_weight)
 
