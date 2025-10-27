@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from apple_music_integration import create_apple_music_playlist_with_scraping
+from apple_music_web_api import create_beatfinder_playlist
 from config import (
     APPLE_MUSIC_SCRAPE_BATCH_SIZE,
     CACHE_DIR,
@@ -724,6 +725,11 @@ def main():
             APPLE_MUSIC_SCRAPE_BATCH_SIZE
         )
         artist_music_data = result.get('artist_data', {})
+
+        # Create actual Apple Music playlist using web API
+        playlist_id = create_beatfinder_playlist(artist_music_data)
+        if not playlist_id:
+            print("Note: Could not create Apple Music playlist (tokens may need refreshing)")
 
     # Output results
     output_file = Path("recommendations.md")
