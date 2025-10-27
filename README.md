@@ -181,8 +181,33 @@ When you run the script, it caches the generated recommendations. Subsequent run
 ### Apple Music Playlist Creation
 - `CREATE_APPLE_MUSIC_PLAYLIST` - Automatically create a playlist with top songs from recommended artists (default: false)
 - `PLAYLIST_SONGS_PER_ARTIST` - Number of songs to add per artist (default: 3)
+- `APPLE_MUSIC_SCRAPE_BATCH_SIZE` - Number of concurrent browsers for scraping (default: 5)
 
-Note: The playlist feature searches your existing Apple Music library for songs by the recommended artists. It works best if you have Apple Music subscription content or a large local library.
+**How it works:**
+1. Scrapes Apple Music catalogue to find top songs for each recommended artist
+2. Creates a playlist named "BeatFinder - YYYY-MM-DD" in your Apple Music library
+3. Only adds songs you don't already have (prevents duplicates)
+4. Handles regional availability automatically
+
+**Token setup** (required for playlist creation):
+
+The playlist feature uses Apple Music's web API via browser-extracted tokens (no Apple Developer subscription needed):
+
+1. Log into https://music.apple.com in your browser
+2. Open browser developer tools (F12 or Cmd+Option+I)
+3. Extract two tokens:
+   - **Dev Token**: Check the Network tab for requests to `amp-api.music.apple.com`. Look for the `Authorization: Bearer ...` header, or find `devToken` in URL parameters. Copy everything after "Bearer "
+   - **Media User Token**: Check Application/Storage → Cookies for `music.apple.com`, find `media-user-token`, or look in the Network tab for the `Media-User-Token` header
+4. Add to your `.env` file:
+   ```
+   APPLE_MUSIC_WEB_DEV_TOKEN=eyJhbGciOiJFUzI1NiI...
+   APPLE_MUSIC_WEB_MEDIA_USER_TOKEN=Ajod0fqyLkVDn4h...
+   ```
+
+**Token expiry:**
+- Dev token: ~6 months
+- Media user token: ~2-4 weeks
+- When expired, re-extract from browser using steps above
 
 ### HTML Visualisation
 - `GENERATE_HTML_VISUALISATION` - Generate an interactive HTML visualisation showing recommendation connections (default: false)
