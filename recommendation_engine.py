@@ -17,6 +17,7 @@ import requests
 from config import (
     CACHE_DIR,
     CACHE_EXPIRY_DAYS,
+    DISLIKED_MIN_TRACK_COUNT,
     ENABLE_PLAY_FREQUENCY_WEIGHTING,
     ENABLE_TAG_SIMILARITY,
     KNOWN_ARTIST_MIN_PLAY_COUNT,
@@ -221,6 +222,12 @@ class RecommendationEngine:
             if (stats["play_count"] >= KNOWN_ARTIST_MIN_PLAY_COUNT or
                 stats["track_count"] >= KNOWN_ARTIST_MIN_TRACKS)
         )
+        self.disliked_artists = set(
+            self._normalise_artist_name(artist)
+            for artist, stats in library_stats.items()
+            if (stats.get("disliked_track_count", 0) >= DISLIKED_MIN_TRACK_COUNT and
+                stats.get("loved_track_count", 0) == 0)
+        )
 
     @staticmethod
     def _normalise_artist_name(name: str) -> str:
@@ -240,6 +247,11 @@ class RecommendationEngine:
 
         for artist, stats in self.library_stats.items():
             is_loved = False
+
+            # Skip disliked artists from being used as recommendation sources
+            if (stats.get("disliked_track_count", 0) >= DISLIKED_MIN_TRACK_COUNT and
+                stats.get("loved_track_count", 0) == 0):
+                continue
 
             if stats["loved"]:
                 is_loved = True
@@ -330,6 +342,8 @@ class RecommendationEngine:
         """Generate artist recommendations"""
         loved_artists = self.get_loved_artists()
         print(f"Analysing {len(loved_artists)} loved/frequently played artists...")
+        if self.disliked_artists:
+            print(f"Filtering {len(self.disliked_artists)} disliked artists from recommendations")
 
         tag_profile = self.build_tag_profile(loved_artists)
 
@@ -363,8 +377,12 @@ class RecommendationEngine:
 
                     for sim_artist in similar:
                         name = sim_artist["name"]
+                        normalised_name = self._normalise_artist_name(name)
 
-                        if self._normalise_artist_name(name) in self.known_artists:
+                        if normalised_name in self.known_artists:
+                            continue
+
+                        if normalised_name in self.disliked_artists:
                             continue
 
                         if name in self.library_stats:

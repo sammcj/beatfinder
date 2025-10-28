@@ -97,6 +97,9 @@ class AppleMusicLibrary:
         artist_stats = defaultdict(lambda: {
             "play_count": 0,
             "loved": False,
+            "disliked": False,
+            "disliked_track_count": 0,
+            "loved_track_count": 0,
             "rating": 0,
             "track_count": 0,
             "last_played": None
@@ -112,6 +115,7 @@ class AppleMusicLibrary:
             play_count = track.get('Play Count', 0)
             rating = track.get('Rating', 0)
             loved = track.get('Loved', False)
+            disliked = track.get('Disliked', False)
             play_date_utc = track.get('Play Date UTC')
 
             artist_stats[artist]["play_count"] += play_count
@@ -120,6 +124,12 @@ class AppleMusicLibrary:
             # Mark if any track is explicitly "loved" in Apple Music
             if loved:
                 artist_stats[artist]["loved"] = True
+                artist_stats[artist]["loved_track_count"] += 1
+
+            # Mark if any track is explicitly "disliked" in Apple Music
+            if disliked:
+                artist_stats[artist]["disliked"] = True
+                artist_stats[artist]["disliked_track_count"] += 1
 
             # Track the highest rating across all tracks for this artist
             artist_stats[artist]["rating"] = max(
@@ -154,6 +164,9 @@ class AppleMusicLibrary:
                 "Artist Name": {
                     "play_count": int,
                     "loved": bool,
+                    "disliked": bool,
+                    "disliked_track_count": int,
+                    "loved_track_count": int,
                     "rating": int,
                     "track_count": int
                 }

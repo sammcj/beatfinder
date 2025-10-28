@@ -24,6 +24,9 @@ LOVED_PLAY_COUNT_THRESHOLD = int(os.getenv("LOVED_PLAY_COUNT_THRESHOLD", "50"))
 LOVED_MIN_TRACK_RATING = int(os.getenv("LOVED_MIN_TRACK_RATING", "4"))  # 1-5 stars
 LOVED_MIN_ARTIST_PLAYS = int(os.getenv("LOVED_MIN_ARTIST_PLAYS", "10"))
 
+# Disliked artist filtering
+DISLIKED_MIN_TRACK_COUNT = int(os.getenv("DISLIKED_MIN_TRACK_COUNT", "2"))  # Min disliked tracks to filter artist
+
 # Cache settings
 CACHE_EXPIRY_DAYS = int(os.getenv("CACHE_EXPIRY_DAYS", "7"))
 RECOMMENDATIONS_CACHE_EXPIRY_DAYS = int(os.getenv("RECOMMENDATIONS_CACHE_EXPIRY_DAYS", "7"))
@@ -81,6 +84,8 @@ def show_config():
     print(f"  'Loved' (used for taste profile):")
     print(f"    - {LOVED_PLAY_COUNT_THRESHOLD}+ plays, OR")
     print(f"    - {LOVED_MIN_TRACK_RATING}+ star rating with {LOVED_MIN_ARTIST_PLAYS}+ plays")
+    print(f"  'Disliked' (filtered from recommendations):")
+    print(f"    - {DISLIKED_MIN_TRACK_COUNT}+ disliked tracks AND no loved tracks")
     print(f"\nRarity preference: {RARITY_PREFERENCE}")
     print(f"Last.fm cache expiry: {CACHE_EXPIRY_DAYS} days")
     print(f"Recommendations cache expiry: {RECOMMENDATIONS_CACHE_EXPIRY_DAYS} days")

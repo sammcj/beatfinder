@@ -72,6 +72,11 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-10)
 - Any track explicitly marked as "loved" in Apple Music, OR
 - `LOVED_PLAY_COUNT_THRESHOLD`+ plays (default: 50), OR
 - Track rated `LOVED_MIN_TRACK_RATING`+ stars (default: 4) with `LOVED_MIN_ARTIST_PLAYS`+ plays (default: 10)
+- Note: Artists meeting disliked criteria are excluded from loved artists (see below)
+
+**"Disliked" Artists** (filtered from recommendations AND excluded from taste profile):
+- Artists with `DISLIKED_MIN_TRACK_COUNT`+ disliked tracks (default: 2) AND no loved tracks
+- These artists are completely excluded: they won't be recommended, and they won't be used to generate recommendations
 
 ### Caching System
 
