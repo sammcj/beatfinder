@@ -16,6 +16,7 @@ from config import (
     APPLE_MUSIC_SCRAPE_BATCH_SIZE,
     CACHE_DIR,
     CREATE_APPLE_MUSIC_PLAYLIST,
+    ENABLE_INTERACTIVE_FILTERING,
     GENERATE_HTML_VISUALISATION,
     LASTFM_API_KEY,
     MAX_RECOMMENDATIONS,
@@ -23,6 +24,10 @@ from config import (
     PLAYLIST_SONGS_PER_ARTIST,
     RARITY_PREFERENCE,
     show_config,
+)
+from interactive_filter import (
+    filter_rejected_from_recommendations,
+    show_interactive_filter,
 )
 from library_parser import AppleMusicLibrary
 from recommendation_engine import (
@@ -641,6 +646,8 @@ def main():
     parser.add_argument("--refresh-cache", action="store_true", help="Refresh Last.fm metadata cache (keeps recommendations cache)")
     parser.add_argument("--refresh-recommendations", action="store_true", help="Regenerate recommendations (keeps Last.fm cache)")
     parser.add_argument("--refresh-all", action="store_true", help="Clear all caches (Last.fm + recommendations)")
+    parser.add_argument("--clear-rejected", action="store_true", help="Clear rejected artists cache")
+    parser.add_argument("--no-interactive", action="store_true", help="Disable interactive filtering for this run")
     parser.add_argument("--regenerate-html", action="store_true", help="Regenerate HTML visualisation from cached recommendations")
     parser.add_argument("--limit", type=int, default=MAX_RECOMMENDATIONS, help="Number of recommendations")
     parser.add_argument("--rarity", type=int, choices=range(1, 16), default=RARITY_PREFERENCE,
@@ -670,6 +677,14 @@ def main():
         if recommendations_cache.exists():
             recommendations_cache.unlink()
             print("Recommendations cache cleared")
+
+    if args.clear_rejected:
+        from interactive_filter import REJECTED_ARTISTS_CACHE
+        if REJECTED_ARTISTS_CACHE.exists():
+            REJECTED_ARTISTS_CACHE.unlink()
+            print("Rejected artists cache cleared")
+        else:
+            print("No rejected artists cache found")
 
     # Handle HTML regeneration only
     if args.regenerate_html:
@@ -715,6 +730,24 @@ def main():
         artist_stats = library.get_artist_stats(force_refresh=args.scan_library)
         lastfm = LastFmClient(LASTFM_API_KEY)
         engine = RecommendationEngine(artist_stats, lastfm)
+
+    # Filter out previously rejected artists
+    recommendations = filter_rejected_from_recommendations(recommendations)
+
+    if not recommendations:
+        print("\nNo recommendations remaining after filtering rejected artists.")
+        print("All recommendations have been previously rejected.")
+        return
+
+    # Show interactive filter if enabled (and not disabled via flag)
+    if ENABLE_INTERACTIVE_FILTERING and not args.no_interactive:
+        try:
+            recommendations = show_interactive_filter(recommendations, args.limit)
+            if not recommendations:
+                print("\nNo recommendations selected. Exiting.")
+                return
+        except KeyboardInterrupt:
+            print("\n\nInteractive filtering cancelled. Keeping all recommendations.")
 
     # Create Apple Music playlist if enabled (with web scraping)
     artist_music_data = {}

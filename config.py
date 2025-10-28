@@ -58,6 +58,9 @@ PLAYLIST_SONGS_PER_ARTIST = int(os.getenv("PLAYLIST_SONGS_PER_ARTIST", "3"))
 APPLE_MUSIC_SCRAPE_BATCH_SIZE = int(os.getenv("APPLE_MUSIC_SCRAPE_BATCH_SIZE", "5"))
 PLAYLIST_MERGE_MODE = os.getenv("PLAYLIST_MERGE_MODE", "true").lower() == "true"
 
+# Interactive filtering
+ENABLE_INTERACTIVE_FILTERING = os.getenv("ENABLE_INTERACTIVE_FILTERING", "true").lower() == "true"
+
 # HTML visualisation
 GENERATE_HTML_VISUALISATION = os.getenv("GENERATE_HTML_VISUALISATION", "false").lower() == "true"
 

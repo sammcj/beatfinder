@@ -24,9 +24,11 @@ make clean          # Clear all caches and output files
 # Advanced usage
 python beatfinder.py --refresh-recommendations  # Regenerate recommendations with current settings
 python beatfinder.py --refresh-all             # Clear all caches (Last.fm + recommendations)
+python beatfinder.py --clear-rejected          # Clear rejected artists cache
+python beatfinder.py --no-interactive          # Skip interactive filtering menu
 python beatfinder.py --regenerate-html         # Regenerate HTML visualisation only
 python beatfinder.py --limit 20                # Change number of recommendations
-python beatfinder.py --rarity 9                # Adjust rarity preference (1-10)
+python beatfinder.py --rarity 9                # Adjust rarity preference (1-15)
 ```
 
 ## Architecture
@@ -61,6 +63,17 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-10)
   - `build_tag_profile()`: Build genre tag profile from loved artists
   - `calculate_tag_similarity()`: Score recommendations by tag overlap
   - `generate_recommendations()`: Main recommendation algorithm
+
+**`interactive_filter`** (interactive_filter.py)
+- Interactive TUI filtering for recommendations using InquirerPy
+- Manages cache of rejected artists that persist across runs
+- Functions:
+  - `load_rejected_artists()`: Load set of rejected artist names from cache
+  - `save_rejected_artists()`: Save rejected artists to cache
+  - `filter_rejected_from_recommendations()`: Filter rejected artists from recommendations
+  - `show_interactive_filter()`: Display checkbox menu for selecting artists to keep
+- Cache file: `cache/rejected_artists.json`
+- Rejected artists are cached permanently until cleared with `--clear-rejected`
 
 ### Artist Classification
 

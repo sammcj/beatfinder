@@ -9,6 +9,7 @@ Discover new artists based on your Apple Music library using Last.fm's recommend
 - Extracts your Apple Music library data from XML export (artists, play counts, loved status, play dates)
 - Fetches similar artists from Last.fm API
 - Filters out artists you've already heard
+- Interactive TUI menu for reviewing and rejecting recommendations (enabled by default)
 - Scores recommendations by frequency, similarity, and rarity
 - Optional advanced features:
   - Tag similarity matching (recommends artists matching your music taste profile)
@@ -117,6 +118,31 @@ python beatfinder.py --limit 20
 ### Change rarity preference:
 ```bash
 python beatfinder.py --rarity 12  # 1 (most popular) to 15 (most obscure)
+```
+
+### Interactive filtering:
+
+By default, BeatFinder shows an interactive menu where you can review and reject recommendations before saving them:
+
+```bash
+python beatfinder.py  # Shows interactive menu (default)
+```
+
+Use SPACE to toggle artists you want to keep, then press ENTER to confirm. Rejected artists are cached and won't appear in future recommendations.
+
+To skip the interactive menu for a single run:
+```bash
+python beatfinder.py --no-interactive
+```
+
+To clear rejected artists cache:
+```bash
+python beatfinder.py --clear-rejected
+```
+
+To disable interactive filtering permanently, set in `.env`:
+```
+ENABLE_INTERACTIVE_FILTERING=false
 ```
 
 ## Output
