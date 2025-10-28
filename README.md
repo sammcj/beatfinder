@@ -4,6 +4,56 @@ Discover new artists based on your Apple Music library using Last.fm's recommend
 
 ![Screenshot](screenshots/screenshot-2025-10-27.png)
 
+## How It Works
+
+```mermaid
+flowchart TD
+    Start([Start]) --> LoadLibrary[Load Apple Music<br>Library XML]
+    LoadLibrary --> ParseLibrary[Parse Library Data<br>Play counts, ratings, loved status]
+
+    ParseLibrary --> ClassifyArtists{Classify Artists}
+
+    ClassifyArtists --> LovedArtists[Loved Artists<br>High plays OR high ratings<br>Used for taste profile]
+    ClassifyArtists --> KnownArtists[Known Artists<br>3+ plays OR 5+ tracks<br>Filtered from output]
+    ClassifyArtists --> DislikedArtists[Disliked Artists<br>2+ disliked tracks<br>Filtered from everything]
+
+    LovedArtists --> FetchSimilar[Fetch Similar Artists<br>from Last.fm API<br>Concurrent requests]
+
+    FetchSimilar --> Score[Score Recommendations<br>Frequency + Match + Rarity<br>Optional: Tag similarity]
+
+    Score --> FilterKnown[Filter Known Artists<br>Remove artists in library]
+
+    FilterKnown --> FilterDisliked[Filter Disliked Artists<br>Remove disliked artists]
+
+    FilterDisliked --> FilterRejected[Filter Rejected Artists<br>Load from cache/rejected_artists.json]
+
+    FilterRejected --> CheckEmpty{Any<br>recommendations<br>left?}
+
+    CheckEmpty -->|No| NoRecs([Exit: No recommendations])
+
+    CheckEmpty -->|Yes| CheckInteractive{Interactive<br>filtering<br>enabled?}
+
+    CheckInteractive -->|Yes| ShowTUI[Show Interactive TUI Menu<br>User selects artists to keep]
+    CheckInteractive -->|No| Output
+
+    ShowTUI --> SaveRejected[Save newly rejected artists<br>to cache/rejected_artists.json]
+
+    SaveRejected --> Output[Generate Output<br>Markdown + HTML + Playlist]
+
+    Output --> End([End])
+
+    classDef inputOutput fill:#E6F3FF,stroke:#4A90E2,color:#1a1a1a
+    classDef process fill:#E8F5E8,stroke:#27AE60,color:#1a1a1a
+    classDef decision fill:#FFF0E6,stroke:#E67E22,color:#1a1a1a
+    classDef filter fill:#F0E6FF,stroke:#8E44AD,color:#1a1a1a
+    classDef stop fill:#F8D7DA,stroke:#E74C3C,color:#1a1a1a
+
+    class Start,End,NoRecs inputOutput
+    class LoadLibrary,ParseLibrary,FetchSimilar,Score,ShowTUI,SaveRejected,Output process
+    class ClassifyArtists,CheckEmpty,CheckInteractive decision
+    class LovedArtists,KnownArtists,DislikedArtists,FilterKnown,FilterDisliked,FilterRejected filter
+```
+
 ## Features
 
 - Extracts your Apple Music library data from XML export (artists, play counts, loved status, play dates)

@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 BeatFinder is a Python application that analyses your Apple Music library and generates artist recommendations using the Last.fm API. It extracts library data from Apple Music's XML export, builds a taste profile from "loved" artists, and recommends new artists based on similarity, rarity, and genre tag matching.
 
+**IMPORTANT**: If you modify the recommendation flow or filtering logic, update the Mermaid diagram in README.md to reflect the changes. The diagram shows the complete processing pipeline from library parsing through to final output.
+
 ## Development Commands
 
 ### Setup
@@ -19,6 +21,8 @@ make install        # Install Python dependencies only
 make run            # Run with cached data (fast, default mode)
 make scan           # Re-scan Apple Music library XML (slow, first time only)
 make refresh        # Refresh Last.fm metadata cache
+make filter         # Review and filter recommendations interactively (same as make run)
+make clear-rejected # Clear rejected artists cache
 make clean          # Clear all caches and output files
 
 # Advanced usage

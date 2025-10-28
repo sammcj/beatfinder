@@ -1,4 +1,4 @@
-.PHONY: setup install run scan refresh clean help
+.PHONY: setup install run scan refresh clean clear-rejected help
 
 help:
 	@echo "BeatFinder - Artist recommendation tool"
@@ -9,6 +9,8 @@ help:
 	@echo "  make run           - Run with cached data (fast)"
 	@echo "  make scan          - Re-scan Music library (slow, first time only)"
 	@echo "  make refresh       - Refresh Last.fm metadata cache"
+	@echo "  make filter        - Review and filter recommendations interactively"
+	@echo "  make clear-rejected - Clear rejected artists cache"
 	@echo "  make clean         - Clear all caches"
 	@echo "  make help          - Show this help"
 
@@ -27,6 +29,12 @@ scan:
 
 refresh:
 	python3 beatfinder.py --refresh-cache
+
+filter:
+	python3 beatfinder.py
+
+clear-rejected:
+	python3 beatfinder.py --clear-rejected
 
 clean:
 	rm -rf cache/
