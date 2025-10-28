@@ -74,6 +74,10 @@ SCORING_RARITY_WEIGHT = float(os.getenv("SCORING_RARITY_WEIGHT", "0.2"))
 CACHE_DIR = Path("cache")
 CACHE_DIR.mkdir(exist_ok=True)
 
+# Data directory for persistent user data (not cleared with cache)
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+
 
 def show_config():
     """Display configuration settings"""

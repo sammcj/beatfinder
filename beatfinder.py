@@ -679,12 +679,12 @@ def main():
             print("Recommendations cache cleared")
 
     if args.clear_rejected:
-        from interactive_filter import REJECTED_ARTISTS_CACHE
-        if REJECTED_ARTISTS_CACHE.exists():
-            REJECTED_ARTISTS_CACHE.unlink()
-            print("Rejected artists cache cleared")
+        from interactive_filter import REJECTED_ARTISTS_FILE
+        if REJECTED_ARTISTS_FILE.exists():
+            REJECTED_ARTISTS_FILE.unlink()
+            print("Rejected artists cleared")
         else:
-            print("No rejected artists cache found")
+            print("No rejected artists found")
 
     # Handle HTML regeneration only
     if args.regenerate_html:
@@ -760,10 +760,28 @@ def main():
         )
         artist_music_data = result.get('artist_data', {})
 
+        # Validate scraped data to ensure no known artists slipped through
+        # (e.g., when scraper found wrong artist page)
+        validated_data = {}
+        filtered_count = 0
+        for artist_name, data in artist_music_data.items():
+            # Check if this artist (or any part of collaboration) is in library
+            if not engine._contains_known_artist(artist_name):
+                validated_data[artist_name] = data
+            else:
+                filtered_count += 1
+                print(f"  Filtered out '{artist_name}' - contains known artist from library")
+
+        if filtered_count > 0:
+            print(f"\n✓ Filtered {filtered_count} artist(s) that matched library artists")
+
         # Create actual Apple Music playlist using web API
-        playlist_id = create_beatfinder_playlist(artist_music_data, merge=PLAYLIST_MERGE_MODE)
+        playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE)
         if not playlist_id:
             print("Note: Could not create Apple Music playlist (tokens may need refreshing)")
+
+        # Update artist_music_data to use validated version for markdown output
+        artist_music_data = validated_data
 
     # Output results
     output_file = Path("recommendations.md")

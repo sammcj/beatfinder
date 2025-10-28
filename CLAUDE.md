@@ -70,14 +70,14 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-15)
 
 **`interactive_filter`** (interactive_filter.py)
 - Interactive TUI filtering for recommendations using InquirerPy
-- Manages cache of rejected artists that persist across runs
+- Manages persistent storage of rejected artists that survive cache clearing
 - Functions:
-  - `load_rejected_artists()`: Load set of rejected artist names from cache
-  - `save_rejected_artists()`: Save rejected artists to cache
+  - `load_rejected_artists()`: Load set of rejected artist names from persistent storage
+  - `save_rejected_artists()`: Save rejected artists to persistent storage
   - `filter_rejected_from_recommendations()`: Filter rejected artists from recommendations
   - `show_interactive_filter()`: Display checkbox menu for selecting artists to keep
-- Cache file: `cache/rejected_artists.json`
-- Rejected artists are cached permanently until cleared with `--clear-rejected`
+- Data file: `data/rejected_artists.json` (persists independently of cache/ folder)
+- Rejected artists persist permanently until cleared with `--clear-rejected`
 
 ### Artist Classification
 
@@ -231,3 +231,7 @@ All settings in `.env` (copy from `.env.example`):
 ### Star Ratings Format
 - Apple Music XML stores ratings as 0-100 integers (4 stars = 80)
 - Code divides by 20 to get 1-5 scale - don't change this or loved artist detection breaks
+
+## Virtual Environment
+
+- We should always use a virtual environment in .venv to manage dependencies, as such it must be sourced before running any commands (`source .venv/bin/activate`)

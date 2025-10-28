@@ -25,7 +25,7 @@ flowchart TD
 
     FilterKnown --> FilterDisliked[Filter Disliked Artists<br>Remove disliked artists]
 
-    FilterDisliked --> FilterRejected[Filter Rejected Artists<br>Load from cache/rejected_artists.json]
+    FilterDisliked --> FilterRejected[Filter Rejected Artists<br>Load from data/rejected_artists.json]
 
     FilterRejected --> CheckEmpty{Any<br>recommendations<br>left?}
 
@@ -36,7 +36,7 @@ flowchart TD
     CheckInteractive -->|Yes| ShowTUI[Show Interactive TUI Menu<br>User selects artists to keep]
     CheckInteractive -->|No| Output
 
-    ShowTUI --> SaveRejected[Save newly rejected artists<br>to cache/rejected_artists.json]
+    ShowTUI --> SaveRejected[Save newly rejected artists<br>to data/rejected_artists.json<br>Persists across cache clearing]
 
     SaveRejected --> Output[Generate Output<br>Markdown + HTML + Playlist]
 
@@ -185,10 +185,12 @@ To skip the interactive menu for a single run:
 python beatfinder.py --no-interactive
 ```
 
-To clear rejected artists cache:
+To clear rejected artists:
 ```bash
 python beatfinder.py --clear-rejected
 ```
+
+**Note**: Rejected artists are stored in `data/rejected_artists.json` and persist independently of cache clearing. Running `make clean` or `--refresh-all` will not remove rejected artists.
 
 To disable interactive filtering permanently, set in `.env`:
 ```

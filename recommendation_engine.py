@@ -237,6 +237,42 @@ class RecommendationEngine:
         normalised = ' '.join(normalised.split())
         return normalised
 
+    def _contains_known_artist(self, artist_name: str) -> bool:
+        """
+        Check if an artist name contains any known artist as a substring.
+        This helps filter collaboration artists like "Nas & Damian Marley"
+        when "Nas" is already in your library.
+
+        Args:
+            artist_name: Artist name to check (will be normalised)
+
+        Returns:
+            True if artist_name contains any known artist name, False otherwise
+        """
+        normalised = self._normalise_artist_name(artist_name)
+
+        # Split on common collaboration separators
+        # e.g., "Nas & Damian Marley" -> ["nas", "damian marley"]
+        # e.g., "Nas, Cordae & Freddie Gibbs" -> ["nas", "cordae", "freddie gibbs"]
+        separators = [' & ', ', ', ' feat. ', ' ft. ', ' featuring ']
+        parts = [normalised]
+
+        for sep in separators:
+            new_parts = []
+            for part in parts:
+                new_parts.extend(part.split(sep))
+            parts = new_parts
+
+        # Clean up each part (trim whitespace)
+        parts = [part.strip() for part in parts if part.strip()]
+
+        # Check if any part matches a known artist
+        for part in parts:
+            if part in self.known_artists:
+                return True
+
+        return False
+
     def get_loved_artists(self) -> List[str]:
         """Get list of loved or frequently played artists for building taste profile"""
         loved = []
@@ -380,6 +416,11 @@ class RecommendationEngine:
                         normalised_name = self._normalise_artist_name(name)
 
                         if normalised_name in self.known_artists:
+                            continue
+
+                        # Filter out collaboration artists containing known artists
+                        # e.g., "Nas & Damian Marley" when "Nas" is in library
+                        if self._contains_known_artist(name):
                             continue
 
                         if normalised_name in self.disliked_artists:

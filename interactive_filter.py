@@ -11,19 +11,19 @@ from typing import Dict, List, Set
 from InquirerPy import inquirer
 from InquirerPy.base.control import Choice
 
-from config import CACHE_DIR
+from config import DATA_DIR
 
-# Cache file for rejected artists
-REJECTED_ARTISTS_CACHE = CACHE_DIR / "rejected_artists.json"
+# Persistent storage for rejected artists (not cleared with cache)
+REJECTED_ARTISTS_FILE = DATA_DIR / "rejected_artists.json"
 
 
 def load_rejected_artists() -> Set[str]:
-    """Load the set of rejected artist names from cache"""
-    if not REJECTED_ARTISTS_CACHE.exists():
+    """Load the set of rejected artist names from persistent storage"""
+    if not REJECTED_ARTISTS_FILE.exists():
         return set()
 
     try:
-        with open(REJECTED_ARTISTS_CACHE, 'r') as f:
+        with open(REJECTED_ARTISTS_FILE, 'r') as f:
             data = json.load(f)
             return set(data.get('rejected_artists', []))
     except (json.JSONDecodeError, KeyError):
@@ -31,8 +31,8 @@ def load_rejected_artists() -> Set[str]:
 
 
 def save_rejected_artists(rejected: Set[str]):
-    """Save the set of rejected artist names to cache"""
-    with open(REJECTED_ARTISTS_CACHE, 'w') as f:
+    """Save the set of rejected artist names to persistent storage"""
+    with open(REJECTED_ARTISTS_FILE, 'w') as f:
         json.dump({
             'rejected_artists': sorted(list(rejected))
         }, f, indent=2)
