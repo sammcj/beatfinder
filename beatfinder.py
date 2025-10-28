@@ -19,6 +19,7 @@ from config import (
     GENERATE_HTML_VISUALISATION,
     LASTFM_API_KEY,
     MAX_RECOMMENDATIONS,
+    PLAYLIST_MERGE_MODE,
     PLAYLIST_SONGS_PER_ARTIST,
     RARITY_PREFERENCE,
     show_config,
@@ -727,7 +728,7 @@ def main():
         artist_music_data = result.get('artist_data', {})
 
         # Create actual Apple Music playlist using web API
-        playlist_id = create_beatfinder_playlist(artist_music_data)
+        playlist_id = create_beatfinder_playlist(artist_music_data, merge=PLAYLIST_MERGE_MODE)
         if not playlist_id:
             print("Note: Could not create Apple Music playlist (tokens may need refreshing)")
 

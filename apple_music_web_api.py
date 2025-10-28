@@ -93,6 +93,43 @@ class AppleMusicWebAPI:
                 return playlist.get('id')
         return None
 
+    def get_playlist_tracks(self, playlist_id: str) -> List[str]:
+        """
+        Get all track IDs from a playlist.
+
+        Args:
+            playlist_id: Playlist ID
+
+        Returns:
+            List of song IDs (catalogue IDs) in the playlist
+        """
+        try:
+            response = self.http.request(
+                'GET',
+                f'{self.HOST}/v1/me/library/playlists/{playlist_id}/tracks',
+                headers=self.headers
+            )
+
+            if response.status == 200:
+                data = json.loads(response.data)
+                tracks = data.get('data', [])
+
+                # Extract catalogue IDs from tracks
+                song_ids = []
+                for track in tracks:
+                    play_params = track.get('attributes', {}).get('playParams', {})
+                    catalogue_id = play_params.get('catalogId') or play_params.get('id')
+                    if catalogue_id:
+                        song_ids.append(str(catalogue_id))
+
+                return song_ids
+            else:
+                print(f"Warning: Could not fetch playlist tracks (status {response.status})")
+                return []
+        except Exception as e:
+            print(f"Error fetching playlist tracks: {e}")
+            return []
+
     def check_songs_in_library(self, song_ids: List[str]) -> List[str]:
         """
         Check which songs from a list are already in the user's library.
@@ -305,41 +342,73 @@ class AppleMusicWebAPI:
                 print(f"    Song {song_id}: error finding equivalent - {e}")
             return False
 
-    def create_or_replace_playlist(
+    def create_or_update_playlist(
         self,
         name: str,
         song_ids: List[str],
-        description: str = ""
+        description: str = "",
+        merge: bool = True
     ) -> Optional[str]:
         """
-        Create a new playlist or replace an existing one with the same name.
+        Create a new playlist or update an existing one with the same name.
 
-        If a playlist with the given name exists, it will be deleted and recreated.
+        If merge=True and playlist exists, new songs are added without duplicates.
+        If merge=False and playlist exists, it will be deleted and recreated.
 
         Args:
             name: Playlist name
             song_ids: List of Apple Music song IDs
             description: Optional description
+            merge: If True, add new songs to existing playlist (default: True)
 
         Returns:
             Playlist ID if successful, None otherwise
         """
         # Check if playlist already exists
         existing_id = self.find_playlist_by_name(name)
-        if existing_id:
+
+        if existing_id and merge:
+            print(f"Found existing playlist '{name}' - adding new songs...")
+            playlist_id = existing_id
+
+            # Get existing tracks
+            existing_tracks = self.get_playlist_tracks(playlist_id)
+            existing_tracks_set = set(existing_tracks)
+
+            # Filter out songs already in playlist
+            new_songs = [sid for sid in song_ids if str(sid) not in existing_tracks_set]
+
+            duplicates_count = len(song_ids) - len(new_songs)
+            if duplicates_count > 0:
+                print(f"✓ Found {duplicates_count} songs already in playlist (will skip)")
+
+            if not new_songs:
+                print(f"All {len(song_ids)} songs are already in the playlist - nothing to add!")
+                return playlist_id
+
+            print(f"Adding {len(new_songs)} new songs to existing playlist...")
+            song_ids = new_songs
+
+        elif existing_id and not merge:
             print(f"Found existing playlist '{name}' - deleting...")
             if not self.delete_playlist(existing_id):
                 print(f"Warning: Could not delete existing playlist")
 
-        # Create new playlist
-        print(f"Creating playlist '{name}'...")
-        playlist_id = self.create_playlist(name, description)
+            # Create new playlist
+            print(f"Creating playlist '{name}'...")
+            playlist_id = self.create_playlist(name, description)
+        else:
+            # Create new playlist
+            print(f"Creating playlist '{name}'...")
+            playlist_id = self.create_playlist(name, description)
 
         if not playlist_id:
             print("Failed to create playlist")
             return None
 
-        print(f"✓ Playlist created (ID: {playlist_id})")
+        # Only print "created" message if not merging into existing playlist
+        if not (existing_id and merge):
+            print(f"✓ Playlist created (ID: {playlist_id})")
 
         # Filter out songs already in library
         if song_ids:
@@ -422,8 +491,30 @@ class AppleMusicWebAPI:
 
         return successful, failed
 
+    def create_or_replace_playlist(
+        self,
+        name: str,
+        song_ids: List[str],
+        description: str = ""
+    ) -> Optional[str]:
+        """
+        Create a new playlist or replace an existing one with the same name.
 
-def create_beatfinder_playlist(artist_song_data: Dict[str, Dict]) -> Optional[str]:
+        If a playlist with the given name exists, it will be deleted and recreated.
+        For backwards compatibility - use create_or_update_playlist with merge parameter instead.
+
+        Args:
+            name: Playlist name
+            song_ids: List of Apple Music song IDs
+            description: Optional description
+
+        Returns:
+            Playlist ID if successful, None otherwise
+        """
+        return self.create_or_update_playlist(name, song_ids, description, merge=False)
+
+
+def create_beatfinder_playlist(artist_song_data: Dict[str, Dict], merge: bool = True) -> Optional[str]:
     """
     Create a BeatFinder playlist with today's date.
 
@@ -431,6 +522,7 @@ def create_beatfinder_playlist(artist_song_data: Dict[str, Dict]) -> Optional[st
         artist_song_data: Dict mapping artist names to their song data
                          (output from apple_music_integration.scrape_artists_parallel)
                          Format: {'Artist Name': {'songs': [{'id': '123', 'title': '...'}, ...]}}
+        merge: If True, add new songs to existing playlist. If False, replace playlist (default: True)
 
     Returns:
         Playlist ID if successful, None otherwise
@@ -452,19 +544,21 @@ def create_beatfinder_playlist(artist_song_data: Dict[str, Dict]) -> Optional[st
         print("No song IDs found to add to playlist")
         return None
 
+    action = "Updating" if merge else "Creating"
     print(f"\n{'='*60}")
-    print(f"Creating Apple Music playlist: '{playlist_name}'")
+    print(f"{action} Apple Music playlist: '{playlist_name}'")
     print(f"{'='*60}\n")
 
-    # Create playlist
+    # Create or update playlist
     try:
         api = AppleMusicWebAPI()
         description = f"Artist recommendations generated by BeatFinder on {today}"
-        playlist_id = api.create_or_replace_playlist(playlist_name, song_ids, description)
+        playlist_id = api.create_or_update_playlist(playlist_name, song_ids, description, merge=merge)
 
         if playlist_id:
+            action_complete = "updated" if merge else "created"
             print(f"\n{'='*60}")
-            print(f"✓ Playlist created successfully!")
+            print(f"✓ Playlist {action_complete} successfully!")
             print(f"  View in Apple Music: https://music.apple.com/library/playlist/{playlist_id}")
             print(f"{'='*60}\n")
 

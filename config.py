@@ -56,6 +56,7 @@ TAG_IGNORE_LIST = set(tag.strip().lower() for tag in TAG_IGNORE_LIST_RAW.split("
 CREATE_APPLE_MUSIC_PLAYLIST = os.getenv("CREATE_APPLE_MUSIC_PLAYLIST", "false").lower() == "true"
 PLAYLIST_SONGS_PER_ARTIST = int(os.getenv("PLAYLIST_SONGS_PER_ARTIST", "3"))
 APPLE_MUSIC_SCRAPE_BATCH_SIZE = int(os.getenv("APPLE_MUSIC_SCRAPE_BATCH_SIZE", "5"))
+PLAYLIST_MERGE_MODE = os.getenv("PLAYLIST_MERGE_MODE", "true").lower() == "true"
 
 # HTML visualisation
 GENERATE_HTML_VISUALISATION = os.getenv("GENERATE_HTML_VISUALISATION", "false").lower() == "true"
