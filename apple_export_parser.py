@@ -36,6 +36,9 @@ class AppleMusicExportParser:
         self.favorites_pickle = self.cache_dir / "favorites.pkl"
         self.play_activity_pickle = self.cache_dir / "play_activity.pkl"
 
+        # Library statistics (populated when parsing)
+        self.library_stats = {}
+
         # Validate export directory
         self._validate_export_dir()
 
@@ -252,11 +255,33 @@ class AppleMusicExportParser:
             # Convert date
             df['Date Played'] = pd.to_datetime(df['Date Played'], format='%Y%m%d', errors='coerce')
 
+            # Calculate statistics
+            oldest_play = df['Date Played'].min()
+            newest_play = df['Date Played'].max()
+            date_range_days = (newest_play - oldest_play).days if pd.notna(oldest_play) and pd.notna(newest_play) else 0
+            date_range_years = date_range_days / 365.25
+
+            # Store play history date statistics
+            self.library_stats.update({
+                "oldest_play": oldest_play.strftime('%d %B %Y') if pd.notna(oldest_play) else None,
+                "newest_play": newest_play.strftime('%d %B %Y') if pd.notna(newest_play) else None,
+                "history_span_years": round(date_range_years, 1) if date_range_days > 0 else 0,
+                "history_span_days": date_range_days if date_range_days > 0 else 0
+            })
+
             # Cache results
             print(f"Caching parsed data for future runs...")
             df.to_pickle(self.play_activity_pickle)
 
             print(f"✓ Parsed {len(df):,} play history entries")
+            print(f"\nListening history statistics:")
+            if pd.notna(oldest_play):
+                print(f"  Oldest play: {oldest_play.strftime('%d %B %Y')}")
+            if pd.notna(newest_play):
+                print(f"  Newest play: {newest_play.strftime('%d %B %Y')}")
+            if date_range_days > 0:
+                print(f"  History span: {date_range_years:.1f} years ({date_range_days:,} days)")
+
             return df
 
         except Exception as e:
@@ -350,7 +375,23 @@ class AppleMusicExportParser:
                 engagement_score = stats["completion_rate"] * (1 - skip_penalty)
                 stats["rating"] = min(100, int(engagement_score * 100))
 
+        # Calculate aggregate statistics
+        total_plays = sum(s["play_count"] for s in artist_stats.values())
+        total_skips = sum(s["skip_count"] for s in artist_stats.values())
+        skip_rate = (total_skips / total_plays * 100) if total_plays > 0 else 0
+
+        # Store aggregate stats (will be updated with play history stats in get_artist_stats)
+        self.library_stats.update({
+            "total_artists": len(artist_stats),
+            "total_plays": total_plays,
+            "total_skips": total_skips,
+            "skip_rate": skip_rate
+        })
+
         print(f"✓ Aggregated statistics for {len(artist_stats)} artists")
+        print(f"  Total plays: {total_plays:,}")
+        print(f"  Total skips: {total_skips:,} ({skip_rate:.1f}%)")
+
         return dict(artist_stats)
 
     def get_artist_stats(self, force_refresh: bool = False) -> Dict[str, Dict]:
@@ -378,8 +419,23 @@ class AppleMusicExportParser:
         # Aggregate by artist
         stats = self._aggregate_by_artist(favorites, play_df)
 
+        # Store loved/disliked counts in library stats
+        self.library_stats.update({
+            "loved_artists": len(favorites["liked"]),
+            "disliked_artists": len(favorites["disliked"])
+        })
+
         # Cache results
         self._save_cached_stats(stats)
         print("✓ Apple Music export data cached for future runs")
 
         return stats
+
+    def get_library_stats(self) -> Dict:
+        """
+        Get library statistics (oldest play, history span, total plays, etc.)
+
+        Returns:
+            Dict with library statistics or empty dict if not available
+        """
+        return self.library_stats.copy()

@@ -33,7 +33,8 @@ from config import (
     SCORING_MATCH_WEIGHT,
     SCORING_RARITY_WEIGHT,
     SCORING_TAG_OVERLAP_WEIGHT,
-    TAG_IGNORE_LIST,
+    TAG_BLACKLIST,
+    TAG_SIMILARITY_IGNORE_LIST,
 )
 
 
@@ -334,7 +335,7 @@ class RecommendationEngine:
 
                     for tag in tags:
                         tag_lower = tag.lower()
-                        if tag_lower in TAG_IGNORE_LIST:
+                        if tag_lower in TAG_SIMILARITY_IGNORE_LIST:
                             continue
                         tag_counts[tag_lower] += weight
                         total_tags += weight
@@ -367,7 +368,7 @@ class RecommendationEngine:
         valid_tag_count = 0
         for tag in artist_tags:
             tag_lower = tag.lower()
-            if tag_lower in TAG_IGNORE_LIST:
+            if tag_lower in TAG_SIMILARITY_IGNORE_LIST:
                 continue
             similarity += tag_profile.get(tag_lower, 0)
             valid_tag_count += 1
@@ -445,6 +446,23 @@ class RecommendationEngine:
                     continue
 
         print(f"\nFound {len(recommendations)} potential recommendations")
+
+        # Filter out artists with blacklisted tags
+        if TAG_BLACKLIST:
+            filtered_recommendations = {}
+            filtered_count = 0
+            for name, data in recommendations.items():
+                artist_tags_lower = {tag.lower() for tag in data["tags"]}
+                # Check if any artist tag matches blacklist
+                if TAG_BLACKLIST & artist_tags_lower:
+                    filtered_count += 1
+                    continue
+                filtered_recommendations[name] = data
+
+            if filtered_count > 0:
+                print(f"Filtered {filtered_count} artist(s) with blacklisted tags: {', '.join(sorted(TAG_BLACKLIST))}")
+
+            recommendations = filtered_recommendations
 
         scored_recommendations = []
         for name, data in recommendations.items():

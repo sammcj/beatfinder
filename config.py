@@ -52,9 +52,13 @@ ENABLE_TAG_SIMILARITY = os.getenv("ENABLE_TAG_SIMILARITY", "false").lower() == "
 ENABLE_PLAY_FREQUENCY_WEIGHTING = os.getenv("ENABLE_PLAY_FREQUENCY_WEIGHTING", "false").lower() == "true"
 LAST_MONTHS_FILTER = int(os.getenv("LAST_MONTHS_FILTER", "0"))
 
-# Tag ignore list - parse comma-separated tags and normalise to lowercase
-TAG_IGNORE_LIST_RAW = os.getenv("TAG_IGNORE_LIST", "")
-TAG_IGNORE_LIST = set(tag.strip().lower() for tag in TAG_IGNORE_LIST_RAW.split(",") if tag.strip())
+# Tag similarity ignore list - tags ignored when calculating similarity scores (not for filtering)
+TAG_SIMILARITY_IGNORE_LIST_RAW = os.getenv("TAG_SIMILARITY_IGNORE_LIST", "")
+TAG_SIMILARITY_IGNORE_LIST = set(tag.strip().lower() for tag in TAG_SIMILARITY_IGNORE_LIST_RAW.split(",") if tag.strip())
+
+# Tag blacklist - completely filter out artists with these tags from recommendations
+TAG_BLACKLIST_RAW = os.getenv("TAG_BLACKLIST", "")
+TAG_BLACKLIST = set(tag.strip().lower() for tag in TAG_BLACKLIST_RAW.split(",") if tag.strip())
 
 # Apple Music playlist creation
 CREATE_APPLE_MUSIC_PLAYLIST = os.getenv("CREATE_APPLE_MUSIC_PLAYLIST", "false").lower() == "true"
@@ -119,8 +123,10 @@ def show_config():
         for feature in advanced_features:
             print(f"  • {feature}")
 
-    # Show ignored tags if any
-    if TAG_IGNORE_LIST:
-        print(f"\nIgnored tags: {', '.join(sorted(TAG_IGNORE_LIST))}")
+    # Show tag filters if any
+    if TAG_BLACKLIST:
+        print(f"\nBlacklisted tags (artists filtered): {', '.join(sorted(TAG_BLACKLIST))}")
+    if TAG_SIMILARITY_IGNORE_LIST:
+        print(f"Similarity ignored tags (not used for scoring): {', '.join(sorted(TAG_SIMILARITY_IGNORE_LIST))}")
 
     print("="*60 + "\n")

@@ -41,12 +41,35 @@ from recommendation_engine import (
 )
 
 
-def format_recommendations(recommendations: List[Dict], limit: int, artist_music_data: Dict[str, Dict] = None) -> str:
-    """Format recommendations as markdown with optional Apple Music links"""
+def format_recommendations(recommendations: List[Dict], limit: int, artist_music_data: Dict[str, Dict] = None, library_stats: Dict = None) -> str:
+    """Format recommendations as markdown with optional Apple Music links and library statistics"""
     output = ["# BeatFinder Recommendations\n"]
     output.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
     output.append(f"Total recommendations: {len(recommendations)}\n")
-    output.append("---\n")
+
+    # Add library statistics if available
+    if library_stats:
+        output.append("\n## Library Statistics\n")
+
+        if library_stats.get("oldest_play") and library_stats.get("history_span_years"):
+            output.append(f"**Listening History:** {library_stats['history_span_years']} years ({library_stats.get('oldest_play')} - {library_stats.get('newest_play')})\n")
+
+        if library_stats.get("total_artists"):
+            output.append(f"**Total Artists:** {library_stats['total_artists']:,}\n")
+
+        if library_stats.get("total_plays"):
+            output.append(f"**Total Plays:** {library_stats['total_plays']:,}\n")
+
+        if library_stats.get("skip_rate") is not None:
+            output.append(f"**Skip Rate:** {library_stats['skip_rate']:.1f}%\n")
+
+        if library_stats.get("loved_artists"):
+            output.append(f"**Loved Artists:** {library_stats['loved_artists']:,}\n")
+
+        if library_stats.get("disliked_artists"):
+            output.append(f"**Disliked Artists:** {library_stats['disliked_artists']:,}\n")
+
+    output.append("\n---\n")
 
     for i, rec in enumerate(recommendations[:limit], 1):
         output.append(f"\n## {i}. {rec['name']}\n")
@@ -88,7 +111,7 @@ def format_recommendations(recommendations: List[Dict], limit: int, artist_music
     return "".join(output)
 
 
-def generate_html_visualisation(recommendations: List[Dict], loved_artists: List[str], limit: int, artist_music_data: Dict[str, Dict] = None) -> bool:
+def generate_html_visualisation(recommendations: List[Dict], loved_artists: List[str], limit: int, artist_music_data: Dict[str, Dict] = None, library_stats: Dict = None) -> bool:
     """
     Generate an interactive HTML visualisation showing recommendation connections
 
@@ -97,6 +120,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
         loved_artists: List of loved artist names
         limit: Number of recommendations to include
         artist_music_data: Optional dict mapping artist names to scraped Apple Music data
+        library_stats: Optional dict with library statistics (from Apple Music export)
 
     Returns:
         True if successful, False otherwise
@@ -180,6 +204,32 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
             })
 
         node_id_counter += 1
+
+    # Build library stats HTML if available
+    library_stats_html = ""
+    if library_stats:
+        stats_parts = []
+
+        if library_stats.get("oldest_play") and library_stats.get("history_span_years"):
+            stats_parts.append(f"<strong>Listening History:</strong> {library_stats['history_span_years']} years ({library_stats.get('oldest_play')} - {library_stats.get('newest_play')})")
+
+        if library_stats.get("total_artists"):
+            stats_parts.append(f"<strong>Total Artists:</strong> {library_stats['total_artists']:,}")
+
+        if library_stats.get("total_plays"):
+            stats_parts.append(f"<strong>Total Plays:</strong> {library_stats['total_plays']:,}")
+
+        if library_stats.get("skip_rate") is not None:
+            stats_parts.append(f"<strong>Skip Rate:</strong> {library_stats['skip_rate']:.1f}%")
+
+        if library_stats.get("loved_artists"):
+            stats_parts.append(f"<strong>Loved Artists:</strong> {library_stats['loved_artists']:,}")
+
+        if library_stats.get("disliked_artists"):
+            stats_parts.append(f"<strong>Disliked Artists:</strong> {library_stats['disliked_artists']:,}")
+
+        if stats_parts:
+            library_stats_html = '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; width: 100%; font-size: 13px; color: #666; line-height: 1.8;">' + ' • '.join(stats_parts) + '</div>'
 
     # Build table rows HTML
     table_rows_html = ""
@@ -455,6 +505,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
             </div>
         </div>
         <p>Click any node for details</p>
+        {library_stats_html}
     </div>
 
     <div id="network"></div>
@@ -718,11 +769,12 @@ def main():
 
         library = get_library_parser()
         artist_stats = library.get_artist_stats()
+        library_stats = library.get_library_stats()
         lastfm = LastFmClient(LASTFM_API_KEY)
         engine = RecommendationEngine(artist_stats, lastfm)
         loved_artists = engine.get_loved_artists()
 
-        generate_html_visualisation(recommendations, loved_artists, args.limit, None)
+        generate_html_visualisation(recommendations, loved_artists, args.limit, None, library_stats)
         return
 
     # Try to load cached recommendations first
@@ -731,6 +783,7 @@ def main():
     if recommendations is None:
         library = get_library_parser()
         artist_stats = library.get_artist_stats(force_refresh=args.scan_library)
+        library_stats = library.get_library_stats()
 
         lastfm = LastFmClient(LASTFM_API_KEY)
 
@@ -748,6 +801,7 @@ def main():
     else:
         library = get_library_parser()
         artist_stats = library.get_artist_stats(force_refresh=args.scan_library)
+        library_stats = library.get_library_stats()
         lastfm = LastFmClient(LASTFM_API_KEY)
         engine = RecommendationEngine(artist_stats, lastfm)
 
@@ -772,8 +826,15 @@ def main():
     # Create Apple Music playlist if enabled (with web scraping)
     artist_music_data = {}
     if CREATE_APPLE_MUSIC_PLAYLIST:
+        # Sort recommendations by primary genre tag for smoother playlist listening
+        # Group by primary tag, then by score within each group
+        sorted_for_playlist = sorted(
+            recommendations[:args.limit],
+            key=lambda x: (x.get('tags', ['unknown'])[0] if x.get('tags') else 'unknown', -x['score'])
+        )
+
         result = create_apple_music_playlist_with_scraping(
-            recommendations,
+            sorted_for_playlist,
             args.limit,
             PLAYLIST_SONGS_PER_ARTIST,
             APPLE_MUSIC_SCRAPE_BATCH_SIZE
@@ -805,7 +866,7 @@ def main():
 
     # Output results
     output_file = Path("recommendations.md")
-    markdown = format_recommendations(recommendations, args.limit, artist_music_data)
+    markdown = format_recommendations(recommendations, args.limit, artist_music_data, library_stats)
     output_file.write_text(markdown)
 
     print(f"\n✓ Generated {min(len(recommendations), args.limit)} recommendations")
@@ -818,7 +879,7 @@ def main():
 
     # Generate HTML visualisation if enabled
     loved_artists = engine.get_loved_artists()
-    generate_html_visualisation(recommendations, loved_artists, args.limit, artist_music_data)
+    generate_html_visualisation(recommendations, loved_artists, args.limit, artist_music_data, library_stats)
 
 
 if __name__ == "__main__":

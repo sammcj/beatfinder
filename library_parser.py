@@ -188,3 +188,15 @@ class AppleMusicLibrary:
         print("✓ Library data cached for future runs")
 
         return stats_dict
+
+    def get_library_stats(self) -> Dict:
+        """
+        Get library statistics
+
+        Note: iTunes Library XML doesn't provide rich statistics like Apple Music export.
+        Returns empty dict for API compatibility with AppleMusicExportParser.
+
+        Returns:
+            Empty dict (iTunes XML doesn't include play history dates)
+        """
+        return {}
