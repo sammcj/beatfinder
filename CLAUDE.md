@@ -82,17 +82,17 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-15)
 ### Artist Classification
 
 **"Known" Artists** (filtered from recommendations):
-- Artists with `KNOWN_ARTIST_MIN_PLAY_COUNT`+ plays (default: 3), OR
-- Artists with `KNOWN_ARTIST_MIN_TRACKS`+ tracks in library (default: 5)
+- Artists with `KNOWN_ARTIST_MIN_PLAY_COUNT`+ plays, OR
+- Artists with `KNOWN_ARTIST_MIN_TRACKS`+ tracks in library
 
 **"Loved" Artists** (used for taste profile):
 - Any track explicitly marked as "loved" in Apple Music, OR
-- `LOVED_PLAY_COUNT_THRESHOLD`+ plays (default: 50), OR
-- Track rated `LOVED_MIN_TRACK_RATING`+ stars (default: 4) with `LOVED_MIN_ARTIST_PLAYS`+ plays (default: 10)
+- `LOVED_PLAY_COUNT_THRESHOLD`+ plays , OR
+- Track rated `LOVED_MIN_TRACK_RATING`+ stars with `LOVED_MIN_ARTIST_PLAYS`+ plays
 - Note: Artists meeting disliked criteria are excluded from loved artists (see below)
 
 **"Disliked" Artists** (filtered from recommendations AND excluded from taste profile):
-- Artists with `DISLIKED_MIN_TRACK_COUNT`+ disliked tracks (default: 2) AND no loved tracks
+- Artists with `DISLIKED_MIN_TRACK_COUNT`+ disliked tracks AND no loved tracks
 - These artists are completely excluded: they won't be recommended, and they won't be used to generate recommendations
 
 ### Caching System
@@ -101,13 +101,13 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-15)
 
 1. **Last.fm API cache** (`cache/lastfm_cache.json`)
    - Caches all API responses (similar artists, tags, artist info)
-   - Expiry: `CACHE_EXPIRY_DAYS` (default: 7 days)
+   - Expiry: `CACHE_EXPIRY_DAYS`
    - Cleared with `--refresh-cache` or `--refresh-all`
 
 2. **Recommendations cache** (`cache/recommendations_cache.json`)
    - Caches scored/ranked recommendations
    - Invalidated if rarity preference changes or cache expires
-   - Expiry: `RECOMMENDATIONS_CACHE_EXPIRY_DAYS` (default: 7 days)
+   - Expiry: `RECOMMENDATIONS_CACHE_EXPIRY_DAYS`
    - Cleared with `--refresh-recommendations` or `--refresh-all`
 
 3. **Library cache** (`cache/library_cache.json`)
@@ -129,14 +129,14 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-15)
 
 **Advanced scoring** (when `ENABLE_TAG_SIMILARITY` or `ENABLE_PLAY_FREQUENCY_WEIGHTING` enabled):
 - Uses configurable weights from `.env`:
-  - `SCORING_FREQUENCY_WEIGHT` (default: 0.3)
-  - `SCORING_TAG_OVERLAP_WEIGHT` (default: 0.3)
-  - `SCORING_MATCH_WEIGHT` (default: 0.2)
-  - `SCORING_RARITY_WEIGHT` (default: 0.2)
+  - `SCORING_FREQUENCY_WEIGHT`
+  - `SCORING_TAG_OVERLAP_WEIGHT`
+  - `SCORING_MATCH_WEIGHT`
+  - `SCORING_RARITY_WEIGHT`
 
 ### Concurrent Processing
 
-- Uses `ThreadPoolExecutor` with `MAX_CONCURRENT_REQUESTS` workers (default: 10)
+- Uses `ThreadPoolExecutor` with `MAX_CONCURRENT_REQUESTS` workers
 - Global rate limiting via `RateLimiter` class ensures thread-safe API access
 - Thread-safe cache access via `threading.Lock`
 
@@ -148,29 +148,30 @@ All settings in `.env` (copy from `.env.example`):
 - `LASTFM_API_KEY`: Get from https://www.last.fm/api/account/create
 
 ### Key Settings
-- `MAX_RECOMMENDATIONS`: Number of recommendations (default: 15)
+- `MAX_RECOMMENDATIONS`: Number of recommendations
 - `RARITY_PREFERENCE`: 1 (popular) to 15 (very obscure), default: 7
-- `KNOWN_ARTIST_MIN_PLAY_COUNT`: Threshold for filtering known artists (default: 3)
-- `KNOWN_ARTIST_MIN_TRACKS`: Track count threshold for known artists (default: 5)
+- `KNOWN_ARTIST_MIN_PLAY_COUNT`: Threshold for filtering known artists
+- `KNOWN_ARTIST_MIN_TRACKS`: Track count threshold for known artists
 
 ### Advanced Features
-- `ENABLE_TAG_SIMILARITY`: Match genre tags to taste profile (default: false)
-- `ENABLE_PLAY_FREQUENCY_WEIGHTING`: Weight by play counts (default: false)
-- `LAST_MONTHS_FILTER`: Time-based filtering in months, 0=disabled (default: 0)
+- `ENABLE_TAG_SIMILARITY`: Match genre tags to taste profile
+- `ENABLE_PLAY_FREQUENCY_WEIGHTING`: Weight by play counts
+- `LAST_MONTHS_FILTER`: Time-based filtering in months, 0=disabled
 - `TAG_IGNORE_LIST`: Comma-separated tags to exclude from scoring
-- `CREATE_APPLE_MUSIC_PLAYLIST`: Auto-create playlist (default: false, requires macOS)
-- `GENERATE_HTML_VISUALISATION`: Generate interactive graph (default: false)
+- `CREATE_APPLE_MUSIC_PLAYLIST`: Auto-create playlist
+- `GENERATE_HTML_VISUALISATION`: Generate interactive graph
 
 ## Output Files
 
 - `recommendations.md`: Markdown report with ranked artists
 - `recommendations_visualisation.html`: Interactive vis.js network graph (if enabled)
-- `cache/`: All cache files
+- `cache/`: Cached files / state
+- `data/`: Persistent data files (e.g. rejected artists)
 
 ## Platform Requirements
 
 - **macOS only** for Apple Music/Music.app integration
-- Python 3.9+
+- Python 3.12+
 - Last.fm API key (free)
 - Apple Music library XML export
 
@@ -235,3 +236,4 @@ All settings in `.env` (copy from `.env.example`):
 ## Virtual Environment
 
 - We should always use a virtual environment in .venv to manage dependencies, as such it must be sourced before running any commands (`source .venv/bin/activate`)
+- Don't try to run the scan for me unless I explicitly ask you too! you'll blow away my playlist!
