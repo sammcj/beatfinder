@@ -1,17 +1,59 @@
 # BeatFinder
 
-Discover new artists based on your Apple Music library using Last.fm's recommendation engine.
+Discover new artists based on your Apple Music listening history using Last.fm's recommendation engine.
+
+**Recommended:** Uses your complete Apple Music streaming history from Apple's privacy export for accurate recommendations based on your actual listening behaviour.
 
 ![Screenshot](screenshots/screenshot-2025-10-27.png)
+
+## Data Sources
+
+### Apple Music Export (Recommended)
+
+Get your complete streaming history via Apple's privacy data export:
+
+**Advantages:**
+- ✅ Complete streaming history (all Apple Music plays, not just local library)
+- ✅ Explicit likes/dislikes from your Favorites
+- ✅ Skip detection (knows which songs you skip)
+- ✅ Thousands of artists vs dozens in local library
+- ✅ More accurate recommendations based on actual listening behaviour
+
+**How to get it:**
+1. Visit [privacy.apple.com](https://privacy.apple.com)
+2. Sign in and request a copy of your data
+3. Select "Apple Media Services information"
+4. Wait for Apple to prepare your data (1-3 days)
+5. Download and extract the archive
+6. Find the "Apple Music Activity" folder
+
+### iTunes Library XML (Alternative)
+
+Export your local library from Music.app (File → Library → Export Library).
+
+**Limitations:**
+- ⚠️ Only includes local library tracks (purchased/matched music)
+- ⚠️ Missing streaming-only plays from Apple Music
+- ⚠️ No explicit like/dislike data
+- ⚠️ "Loved" artists inferred from play counts and star ratings
+- ⚠️ Typically only captures a small fraction of your actual listening
+
+**Best for:** Users who primarily listen to purchased/downloaded music rather than streaming.
 
 ## How It Works
 
 ```mermaid
 flowchart TD
-    Start([Start]) --> LoadLibrary[Load Apple Music<br>Library XML]
+    Start([Start]) --> CheckSource{Data Source}
+
+    CheckSource -->|Apple Music Export<br>Recommended| LoadExport[Load Apple Music Export<br>Favorites CSV + Play History CSV]
+    CheckSource -->|iTunes Library XML<br>Alternative| LoadLibrary[Load iTunes Library XML]
+
+    LoadExport --> ParseExport[Parse Export Data<br>Explicit likes/dislikes, play counts,<br>skip counts, completion rates]
     LoadLibrary --> ParseLibrary[Parse Library Data<br>Play counts, ratings, loved status]
 
-    ParseLibrary --> ClassifyArtists{Classify Artists}
+    ParseExport --> ClassifyArtists{Classify Artists}
+    ParseLibrary --> ClassifyArtists
 
     ClassifyArtists --> LovedArtists[Loved Artists<br>High plays OR high ratings<br>Used for taste profile]
     ClassifyArtists --> KnownArtists[Known Artists<br>3+ plays OR 5+ tracks<br>Filtered from output]
@@ -56,26 +98,31 @@ flowchart TD
 
 ## Features
 
-- Extracts your Apple Music library data from XML export (artists, play counts, loved status, play dates)
+- **Multiple data sources:**
+  - Apple Music export (recommended): Complete streaming history with explicit preferences
+  - iTunes Library XML (alternative): Local library data only
 - Fetches similar artists from Last.fm API
 - Filters out artists you've already heard
 - Interactive TUI menu for reviewing and rejecting recommendations (enabled by default)
 - Scores recommendations by frequency, similarity, and rarity
+- Skip detection and engagement analysis (Apple Music export only)
 - Optional advanced features:
   - Tag similarity matching (recommends artists matching your music taste profile)
   - Play frequency weighting (prioritises recommendations from your most-played artists)
   - Time-based filtering (recommendations based on recent listening patterns)
   - Apple Music playlist creation (automatically builds a playlist with top songs from recommendations)
   - HTML visualisation (interactive network graph showing recommendation connections)
-- Caches API responses to minimise requests
+- Efficient parsing with pandas + pickle caching
 - Concurrent API requests for faster processing
 
 ## Requirements
 
-- macOS with Apple Music/Music.app
-  - Export of your library XML (File → Library → Export Library...)
+- macOS (for Apple Music integration)
 - Python 3.9+
 - Last.fm API key (free)
+- **One of:**
+  - **Apple Music export data** (recommended) - Request from [privacy.apple.com](https://privacy.apple.com)
+  - iTunes Library XML export (alternative) - Export from Music.app (File → Library → Export Library)
 
 ## Setup
 
@@ -91,46 +138,95 @@ pip install -r requirements.txt
 3. Configure:
 ```bash
 cp .env.example .env
-# Edit .env and add your Last.fm API key
+# Edit .env and configure:
+# - Add your Last.fm API key
+# - Set USE_APPLE_EXPORT=true (recommended) or false (iTunes XML)
+# - Set APPLE_EXPORT_DIR path (if using Apple Music export)
 ```
 
 ## Usage
 
-### First run - export your library:
+### First Run
 
-1. Export your Apple Music library:
+#### Option 1: Apple Music Export (Recommended)
+
+1. **Request your data** from Apple:
+   - Visit [privacy.apple.com](https://privacy.apple.com)
+   - Sign in → "Request a copy of your data"
+   - Select "Apple Media Services information"
+   - Wait 1-3 days for Apple to prepare your data
+   - Download and extract the archive
+
+2. **Configure** `.env`:
+   ```bash
+   USE_APPLE_EXPORT=true
+   APPLE_EXPORT_DIR=/path/to/Apple Media Services information Part 1 of 2/Apple_Media_Services/Apple Music Activity/
+   ```
+
+3. **Run** BeatFinder:
+   ```bash
+   python beatfinder.py
+   ```
+
+**First run output:**
+```
+Parsing favorites: Apple Music - Favorites.csv
+✓ Found 2086 liked artists, 781 disliked artists
+Parsing play history: Apple Music - Play History Daily Tracks.csv
+File size: 9.1 MB
+✓ Parsed 71,934 play history entries
+Aggregating statistics by artist...
+✓ Aggregated statistics for 9,916 artists
+✓ Apple Music export data cached for future runs
+```
+
+#### Option 2: iTunes Library XML (Alternative)
+
+1. **Export** your library:
    - Open Music.app
    - File → Library → Export Library...
    - Save as `Library.xml` to your Downloads folder
 
-2. Run the script (parses the XML and fetches recommendations):
-```bash
-python beatfinder.py
-```
+2. **Configure** `.env`:
+   ```bash
+   USE_APPLE_EXPORT=false
+   ```
 
-Shows progress for large libraries:
+3. **Run** BeatFinder:
+   ```bash
+   python beatfinder.py
+   ```
+
+**First run output:**
 ```
 Parsing library XML: /Users/you/Downloads/Library.xml
 File size: 137.3 MB
 ✓ Parsed in 6.6 seconds
 Processing 99,742 tracks...
-  Processed 10,000 / 99,742 tracks...
-  ...
 ✓ Found 8,563 artists
 ✓ Library data cached for future runs
-
-Analysing 1,770 loved/frequently played artists...
-  Progress: 500/1770 artists processed...
 ```
 
-### Subsequent runs - use cached data (fast):
+### Subsequent Runs - Use Cached Data (Fast)
 ```bash
 python beatfinder.py
 ```
 
 Uses cached recommendations if available and valid. This is very fast since it skips recommendation generation.
 
-### Refresh Last.fm metadata cache:
+### Re-scan Your Library/Export
+
+When you have new listening data (download fresh Apple Music export or re-export iTunes library):
+
+```bash
+python beatfinder.py --scan-library
+```
+
+This forces re-parsing of your data source:
+- **Apple Music export**: Re-parses Favorites.csv and Play History CSV (~3 seconds)
+- **iTunes Library XML**: Re-parses Library.xml (~5-10 seconds for large libraries)
+
+### Refresh Last.fm Metadata Cache
 ```bash
 python beatfinder.py --refresh-cache
 ```
@@ -210,6 +306,22 @@ Results are written to `recommendations.md` with:
 
 Edit `.env` to customise:
 
+### Data Source
+
+- `USE_APPLE_EXPORT` - Use Apple Music export (true, recommended) or iTunes XML (false)
+- `APPLE_EXPORT_DIR` - Path to "Apple Music Activity" folder from Apple privacy export
+
+Example:
+```bash
+# Recommended: Use Apple Music export
+USE_APPLE_EXPORT=true
+APPLE_EXPORT_DIR=/Users/you/Downloads/Apple Media Services information Part 1 of 2/Apple_Media_Services/Apple Music Activity/
+
+# Alternative: Use iTunes Library XML
+USE_APPLE_EXPORT=false
+# No path needed - automatically finds Library.xml in Downloads or Music library
+```
+
 ### Basic Settings
 - `MAX_RECOMMENDATIONS` - Number of artists to recommend (default: 15)
 - `RARITY_PREFERENCE` - Scale from 1 (most popular) to 15 (most obscure), default: 7
@@ -229,7 +341,8 @@ Artists matching either of these criteria won't be recommended (you already know
 The track count filter is especially useful for Apple Music streaming users, where play counts may be 0 but you have many tracks added to your library. If you have 5+ tracks by an artist, you clearly know them!
 
 **"Loved" Artists** (used to build your taste profile):
-- Artists matching any of these criteria are used to find similar artists:
+- **Apple Music export:** Artists with explicit "LIKE" in Favorites.csv, OR artists meeting play count thresholds
+- **iTunes Library XML:** Artists matching any of these criteria:
   - `LOVED_PLAY_COUNT_THRESHOLD` - High total play count alone (default: 50 plays), OR
   - High rating with minimum plays:
     - `LOVED_MIN_TRACK_RATING` - Minimum star rating (1-5 scale) of artist's highest-rated track (default: 4)
@@ -309,11 +422,10 @@ Note: Weights must sum to 1.0
 
 ## How It Works
 
-1. Parses your Apple Music library XML export to extract:
-   - Artist play counts and ratings
-   - Loved status
-   - Last played dates (for time filtering)
-2. Identifies your "loved" artists (high play count or 4+ star rating)
+1. **Parses your listening data:**
+   - **Apple Music export:** Favorites.csv (explicit likes/dislikes) + Play History Daily Tracks.csv (complete streaming history with skip detection)
+   - **iTunes Library XML:** Play counts, ratings, loved status from local library
+2. Identifies your "loved" artists (explicit likes or high engagement)
 3. Optionally filters to recent listening period
 4. Builds your music taste profile from genre tags (if enabled)
 5. Queries Last.fm concurrently for similar artists
@@ -323,9 +435,11 @@ Note: Weights must sum to 1.0
    - Match score (Last.fm's similarity rating)
    - Rarity (based on Last.fm listener counts)
    - Play frequency weighting (recommendations from most-played artists ranked higher)
-7. Filters out artists already in your library or barely played
-8. Fetches detailed info for top recommendations
-9. Outputs ranked recommendations to `recommendations.md`
+7. Filters out artists already in your library or explicitly disliked
+8. Interactive filtering menu (reject unwanted recommendations)
+9. Fetches detailed info for top recommendations
+10. Outputs ranked recommendations to `recommendations.md`
+11. Optionally creates Apple Music playlist with top songs
 
 ## Licence
 
