@@ -14,6 +14,10 @@ load_dotenv()
 # Last.fm API
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
+# Library source - Apple Music export (streaming history) or iTunes XML (local library)
+USE_APPLE_EXPORT = os.getenv("USE_APPLE_EXPORT", "false").lower() == "true"
+APPLE_EXPORT_DIR = os.getenv("APPLE_EXPORT_DIR", "")
+
 # Recommendation settings
 MAX_RECOMMENDATIONS = int(os.getenv("MAX_RECOMMENDATIONS", "15"))
 
@@ -84,6 +88,7 @@ def show_config():
     print("\n" + "="*60)
     print("BeatFinder Configuration")
     print("="*60)
+    print(f"Library source: {'Apple Music Export (streaming)' if USE_APPLE_EXPORT else 'iTunes XML (local library)'}")
     print(f"Max recommendations: {MAX_RECOMMENDATIONS}")
     print(f"\nArtist classification:")
     print(f"  'Known' (filtered from recommendations):")

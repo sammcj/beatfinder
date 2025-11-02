@@ -13,6 +13,7 @@ from typing import Dict, List
 from apple_music_integration import create_apple_music_playlist_with_scraping
 from apple_music_web_api import create_beatfinder_playlist
 from config import (
+    APPLE_EXPORT_DIR,
     APPLE_MUSIC_SCRAPE_BATCH_SIZE,
     CACHE_DIR,
     CREATE_APPLE_MUSIC_PLAYLIST,
@@ -23,6 +24,7 @@ from config import (
     PLAYLIST_MERGE_MODE,
     PLAYLIST_SONGS_PER_ARTIST,
     RARITY_PREFERENCE,
+    USE_APPLE_EXPORT,
     show_config,
 )
 from interactive_filter import (
@@ -30,6 +32,7 @@ from interactive_filter import (
     show_interactive_filter,
 )
 from library_parser import AppleMusicLibrary
+from apple_export_parser import AppleMusicExportParser
 from recommendation_engine import (
     LastFmClient,
     RecommendationEngine,
@@ -640,6 +643,23 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
         return False
 
 
+def get_library_parser():
+    """
+    Get the appropriate library parser based on configuration
+
+    Returns:
+        AppleMusicExportParser if USE_APPLE_EXPORT is True, otherwise AppleMusicLibrary
+    """
+    if USE_APPLE_EXPORT:
+        if not APPLE_EXPORT_DIR:
+            print("\nError: USE_APPLE_EXPORT is enabled but APPLE_EXPORT_DIR is not set")
+            print("Please set APPLE_EXPORT_DIR in your .env file to point to the 'Apple Music Activity' folder")
+            sys.exit(1)
+        return AppleMusicExportParser(APPLE_EXPORT_DIR)
+    else:
+        return AppleMusicLibrary()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Discover new artists based on your Apple Music library")
     parser.add_argument("--scan-library", action="store_true", help="Force re-scan of Music library (slow)")
@@ -696,7 +716,7 @@ def main():
             print("Run without --regenerate-html to generate recommendations first.")
             sys.exit(1)
 
-        library = AppleMusicLibrary()
+        library = get_library_parser()
         artist_stats = library.get_artist_stats()
         lastfm = LastFmClient(LASTFM_API_KEY)
         engine = RecommendationEngine(artist_stats, lastfm)
@@ -709,7 +729,7 @@ def main():
     recommendations = load_recommendations_cache(args.rarity)
 
     if recommendations is None:
-        library = AppleMusicLibrary()
+        library = get_library_parser()
         artist_stats = library.get_artist_stats(force_refresh=args.scan_library)
 
         lastfm = LastFmClient(LASTFM_API_KEY)
@@ -726,7 +746,7 @@ def main():
         loved_artists = engine.get_loved_artists()
         save_recommendations_cache(recommendations, loved_artists, args.rarity)
     else:
-        library = AppleMusicLibrary()
+        library = get_library_parser()
         artist_stats = library.get_artist_stats(force_refresh=args.scan_library)
         lastfm = LastFmClient(LASTFM_API_KEY)
         engine = RecommendationEngine(artist_stats, lastfm)
