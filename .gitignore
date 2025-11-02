@@ -8,4 +8,5 @@ __pycache__/
 recommendations*.md
 recommendations*.json
 recommendations_visualisation.html
-tmp-apple-music-playlist-example
+tmp-apple-music-playlist-example/
+Apple Music Activity/
