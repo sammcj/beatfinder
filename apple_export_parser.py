@@ -128,17 +128,20 @@ class AppleMusicExportParser:
 
         return None
 
-    def _parse_favorites(self) -> Dict[str, Set[str]]:
+    def _parse_favorites(self, force_refresh: bool = False) -> Dict[str, Set[str]]:
         """
         Parse Favorites.csv to extract explicit likes/dislikes
+
+        Args:
+            force_refresh: If True, ignore cache and re-parse
 
         Returns:
             Dict with 'liked' and 'disliked' sets of artist names
         """
         favorites_file = self.export_dir / "Apple Music - Favorites.csv"
 
-        # Check pickle cache
-        if self.favorites_pickle.exists():
+        # Check pickle cache (unless force refresh)
+        if not force_refresh and self.favorites_pickle.exists():
             try:
                 with open(self.favorites_pickle, 'rb') as f:
                     cached = pickle.load(f)
@@ -195,20 +198,23 @@ class AppleMusicExportParser:
         print(f"✓ Found {len(liked_artists)} liked artists, {len(disliked_artists)} disliked artists")
         return result
 
-    def _parse_play_history(self) -> pd.DataFrame:
+    def _parse_play_history(self, force_refresh: bool = False) -> pd.DataFrame:
         """
         Parse Play History Daily Tracks CSV with pickle caching for performance
 
         This file aggregates plays by day and includes "Artist - Song" in Track Description field,
         making it much simpler and faster to parse than the full Play Activity CSV.
 
+        Args:
+            force_refresh: If True, ignore cache and re-parse
+
         Returns:
             DataFrame with play history data
         """
         play_history_file = self.export_dir / "Apple Music - Play History Daily Tracks.csv"
 
-        # Check pickle cache
-        if self.play_activity_pickle.exists():
+        # Check pickle cache (unless force refresh)
+        if not force_refresh and self.play_activity_pickle.exists():
             try:
                 cached = pd.read_pickle(self.play_activity_pickle)
                 cache_time = self.play_activity_pickle.stat().st_mtime
@@ -366,8 +372,8 @@ class AppleMusicExportParser:
                 return cached
 
         # Parse export data
-        favorites = self._parse_favorites()
-        play_df = self._parse_play_history()
+        favorites = self._parse_favorites(force_refresh=force_refresh)
+        play_df = self._parse_play_history(force_refresh=force_refresh)
 
         # Aggregate by artist
         stats = self._aggregate_by_artist(favorites, play_df)
