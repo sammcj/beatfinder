@@ -1,0 +1,56 @@
+<div class="space-y-4">
+    <!-- Visual Meter -->
+    <div class="relative h-8 bg-gradient-to-r from-green-200 via-yellow-200 to-red-200 rounded-full overflow-hidden">
+        <div class="absolute inset-0 flex items-center justify-between px-4 text-xs font-medium text-slate-700">
+            <span>Very Broad</span>
+            <span>Balanced</span>
+            <span>Very Narrow</span>
+        </div>
+
+        <!-- Indicator -->
+        <div
+            class="absolute top-0 h-full w-1 bg-slate-800 shadow-lg transition-all duration-300"
+            style="left: {{ narrowness }}%;"
+        >
+            <div class="absolute -top-1 -left-2 w-5 h-10 bg-slate-800 rounded-sm shadow-lg"></div>
+        </div>
+    </div>
+
+    <!-- Status Text -->
+    <div class="text-center">
+        <div class="text-lg font-semibold
+            {% if narrowness > 70 %}text-red-600
+            {% elif narrowness > 50 %}text-orange-600
+            {% elif narrowness > 30 %}text-yellow-600
+            {% elif narrowness > 15 %}text-green-600
+            {% else %}text-emerald-600{% endif %}">
+            {{ impact_text }}
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+            {% if narrowness > 70 %}
+                Very specific criteria - fewer recommendations expected
+            {% elif narrowness > 50 %}
+                Moderately filtered - targeted recommendations
+            {% elif narrowness > 30 %}
+                Balanced filtering - good variety expected
+            {% elif narrowness > 15 %}
+                Light filtering - wide range of recommendations
+            {% else %}
+                Minimal filtering - maximum discovery potential
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Factors -->
+    <div class="pt-3 border-t border-slate-200">
+        <div class="text-xs">
+            <div class="font-medium text-slate-700 mb-2">What affects scope?</div>
+            <ul class="space-y-1 text-slate-500 ml-4 list-disc">
+                <li>Tag blacklist entries (more = narrower)</li>
+                <li>Time filter duration (more recent = narrower)</li>
+                <li>High loved artist thresholds (higher = narrower)</li>
+                <li>Rarity preference (affects diversity)</li>
+            </ul>
+        </div>
+    </div>
+</div>

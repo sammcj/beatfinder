@@ -1,0 +1,23 @@
+<div class="grid grid-cols-3 gap-3 text-center">
+    <div class="bg-green-50 rounded-lg p-3 border border-green-200">
+        <div class="text-2xl font-bold text-green-600">{{ stats.loved_artists }}</div>
+        <div class="text-xs text-green-700 mt-1">Loved</div>
+        <div class="text-xs text-green-600 mt-1">Taste Profile</div>
+    </div>
+
+    <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+        <div class="text-2xl font-bold text-slate-600">{{ stats.known_artists }}</div>
+        <div class="text-xs text-slate-700 mt-1">Known</div>
+        <div class="text-xs text-slate-600 mt-1">Filtered Out</div>
+    </div>
+
+    <div class="bg-red-50 rounded-lg p-3 border border-red-200">
+        <div class="text-2xl font-bold text-red-600">{{ stats.disliked_artists }}</div>
+        <div class="text-xs text-red-700 mt-1">Disliked</div>
+        <div class="text-xs text-red-600 mt-1">Excluded</div>
+    </div>
+</div>
+
+<p class="text-xs text-slate-500 mt-3 text-center">
+    Adjusting thresholds changes how artists are classified
+</p>

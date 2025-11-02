@@ -46,7 +46,7 @@ Export your local library from Music.app (File → Library → Export Library).
 flowchart TD
     Start([Start]) --> CheckSource{Data Source}
 
-    CheckSource -->|Apple Music Export<br>Recommended| LoadExport[Load Apple Music Export<br>Favorites CSV + Play History CSV]
+    CheckSource -->|Apple Music Export<br>Recommended| LoadExport[Load Apple Music Export<br>Favourites CSV + Play History CSV]
     CheckSource -->|iTunes Library XML<br>Alternative| LoadLibrary[Load iTunes Library XML]
 
     LoadExport --> ParseExport[Parse Export Data<br>Explicit likes/dislikes, play counts,<br>skip counts, completion rates]
@@ -394,8 +394,8 @@ The playlist feature uses Apple Music's web API via browser-extracted tokens (no
    - **Media User Token**: Check Application/Storage → Cookies for `music.apple.com`, find `media-user-token`, or look in the Network tab for the `Media-User-Token` header
 4. Add to your `.env` file:
    ```
-   APPLE_MUSIC_WEB_DEV_TOKEN=eyJhbGciOiJFUzI1NiI...
-   APPLE_MUSIC_WEB_MEDIA_USER_TOKEN=Ajod0fqyLkVDn4h...
+   APPLE_MUSIC_WEB_DEV_TOKEN=abcd...
+   APPLE_MUSIC_WEB_MEDIA_USER_TOKEN=edfggh...
    ```
 
 **Token expiry:**

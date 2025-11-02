@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column: Configuration -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Library Statistics -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Library Statistics</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-primary-600">{{ library_stats.total_artists }}</div>
+                    <div class="text-sm text-slate-600 mt-1">Total Artists</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600">{{ library_stats.loved_artists }}</div>
+                    <div class="text-sm text-slate-600 mt-1">Loved</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-slate-600">{{ library_stats.known_artists }}</div>
+                    <div class="text-sm text-slate-600 mt-1">Known</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-red-600">{{ library_stats.disliked_artists }}</div>
+                    <div class="text-sm text-slate-600 mt-1">Disliked</div>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-200 text-sm text-slate-600">
+                <div class="flex justify-between">
+                    <span>Total Plays:</span>
+                    <span class="font-medium">{{ "{:,}".format(library_stats.total_plays) }}</span>
+                </div>
+                <div class="flex justify-between mt-1">
+                    <span>Skip Rate:</span>
+                    <span class="font-medium">{{ (library_stats.skip_rate * 100)|round(1) }}%</span>
+                </div>
+                <div class="flex justify-between mt-1">
+                    <span>History Span:</span>
+                    <span class="font-medium">{{ library_stats.history_span_days }} days</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendation Settings -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Recommendation Settings</h2>
+
+            <form id="config-form">
+                <!-- Rarity Preference -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-medium text-slate-700">
+                            Rarity Preference
+                        </label>
+                        <span id="rarity-value" class="text-sm font-semibold text-primary-600">{{ config.rarity_preference }}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-slate-500">Popular</span>
+                        <input
+                            type="range"
+                            name="rarity"
+                            id="rarity-slider"
+                            min="1"
+                            max="15"
+                            value="{{ config.rarity_preference }}"
+                            hx-post="/update-weights"
+                            hx-trigger="input changed delay:200ms"
+                            hx-target="#weight-chart-container"
+                            hx-swap="innerHTML"
+                            hx-include="[name='rarity']"
+                            oninput="document.getElementById('rarity-value').textContent = this.value; updateAllDynamicElements()"
+                        >
+                        <span class="text-xs text-slate-500">Obscure</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Controls preference for popular vs obscure artists</p>
+                </div>
+
+                <!-- Max Recommendations -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-medium text-slate-700">
+                            Number of Recommendations
+                        </label>
+                        <span id="max-recs-value" class="text-sm font-semibold text-primary-600">{{ config.max_recommendations }}</span>
+                    </div>
+                    <input
+                        type="range"
+                        name="max_recommendations"
+                        id="max-recs-slider"
+                        min="5"
+                        max="100"
+                        step="5"
+                        value="{{ config.max_recommendations }}"
+                        oninput="document.getElementById('max-recs-value').textContent = this.value"
+                        hx-post="/preview-recommendations"
+                        hx-trigger="input changed delay:300ms"
+                        hx-target="#preview-container"
+                        hx-include="#config-form"
+                    >
+                </div>
+
+                <!-- Artist Classification Thresholds -->
+                <div class="border-t border-slate-200 pt-6 mt-6">
+                    <h3 class="text-sm font-semibold text-slate-900 mb-4">Artist Classification</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-medium text-slate-700">Known: Min Play Count</label>
+                                <span id="known-play-value" class="text-xs font-semibold text-slate-600">{{ config.known_artist_min_play_count }}</span>
+                            </div>
+                            <input
+                                type="range"
+                                name="known_play_count"
+                                min="1"
+                                max="20"
+                                value="{{ config.known_artist_min_play_count }}"
+                                class="w-full"
+                                oninput="document.getElementById('known-play-value').textContent = this.value"
+                                hx-post="/update-artist-stats"
+                                hx-trigger="input changed delay:300ms"
+                                hx-target="#artist-stats-container"
+                                hx-include="[name='known_play_count'],[name='loved_play_count']"
+                            >
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-medium text-slate-700">Loved: Min Play Count</label>
+                                <span id="loved-play-value" class="text-xs font-semibold text-green-600">{{ config.loved_play_count_threshold }}</span>
+                            </div>
+                            <input
+                                type="range"
+                                name="loved_play_count"
+                                min="10"
+                                max="200"
+                                step="10"
+                                value="{{ config.loved_play_count_threshold }}"
+                                class="w-full"
+                                oninput="document.getElementById('loved-play-value').textContent = this.value"
+                                hx-post="/update-artist-stats"
+                                hx-trigger="input changed delay:300ms"
+                                hx-target="#artist-stats-container"
+                                hx-include="[name='known_play_count'],[name='loved_play_count']"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Artist Stats -->
+                    <div id="artist-stats-container" class="mt-4">
+                        {% set stats = {'loved_artists': library_stats.loved_artists, 'known_artists': library_stats.known_artists, 'disliked_artists': library_stats.disliked_artists} %}
+                        {% include 'partials/artist_stats.html' %}
+                    </div>
+                </div>
+
+                <!-- Advanced Features -->
+                <div class="border-t border-slate-200 pt-6 mt-6">
+                    <h3 class="text-sm font-semibold text-slate-900 mb-4">Advanced Features</h3>
+
+                    <div class="space-y-4">
+                        <!-- Tag Similarity -->
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                <input
+                                    type="checkbox"
+                                    name="enable_tag_similarity"
+                                    id="enable-tags"
+                                    {% if config.enable_tag_similarity %}checked{% endif %}
+                                    class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                                    hx-post="/update-tag-profile"
+                                    hx-trigger="change"
+                                    hx-target="#tag-cloud-container"
+                                    hx-include="[name='tag_ignore_list'],[name='tag_blacklist']"
+                                    hx-vals='js:{"enable_tag_similarity": document.getElementById("enable-tags").checked}'
+                                >
+                            </div>
+                            <div class="ml-3">
+                                <label for="enable-tags" class="text-sm font-medium text-slate-700">Enable Tag Similarity Matching</label>
+                                <p class="text-xs text-slate-500 mt-1">Match recommendations to your taste profile's genre tags</p>
+                            </div>
+                        </div>
+
+                        <!-- Play Frequency Weighting -->
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                <input
+                                    type="checkbox"
+                                    name="enable_play_frequency_weighting"
+                                    {% if config.enable_play_frequency_weighting %}checked{% endif %}
+                                    class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                                >
+                            </div>
+                            <div class="ml-3">
+                                <label class="text-sm font-medium text-slate-700">Enable Play Frequency Weighting</label>
+                                <p class="text-xs text-slate-500 mt-1">Weight recommendations by how often you play loved artists</p>
+                            </div>
+                        </div>
+
+                        <!-- Tag Ignore List -->
+                        <div>
+                            <label class="text-xs font-medium text-slate-700 block mb-1">Tag Similarity Ignore List</label>
+                            <input
+                                type="text"
+                                name="tag_ignore_list"
+                                value="{{ config.tag_similarity_ignore_list }}"
+                                placeholder="e.g., pop, rock, indie"
+                                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                hx-post="/update-tag-profile"
+                                hx-trigger="input changed delay:500ms"
+                                hx-target="#tag-cloud-container"
+                                hx-include="[name='tag_blacklist']"
+                                hx-vals='js:{"enable_tag_similarity": document.getElementById("enable-tags").checked}'
+                            >
+                            <p class="text-xs text-slate-500 mt-1">Tags excluded from similarity scoring (comma-separated)</p>
+                        </div>
+
+                        <!-- Tag Blacklist -->
+                        <div>
+                            <label class="text-xs font-medium text-slate-700 block mb-1">Tag Blacklist</label>
+                            <input
+                                type="text"
+                                name="tag_blacklist"
+                                value="{{ config.tag_blacklist }}"
+                                placeholder="e.g., christmas, country"
+                                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                hx-post="/update-tag-profile"
+                                hx-trigger="input changed delay:500ms"
+                                hx-target="#tag-cloud-container"
+                                hx-include="[name='tag_ignore_list']"
+                                hx-vals='js:{"enable_tag_similarity": document.getElementById("enable-tags").checked}'
+                                oninput="updateImpactMeter()"
+                            >
+                            <p class="text-xs text-slate-500 mt-1">Completely filter out artists with these tags (comma-separated)</p>
+                        </div>
+
+                        <!-- Time Filter -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-medium text-slate-700">Recent Listening Filter (months)</label>
+                                <span id="time-filter-value" class="text-xs font-semibold text-slate-600">
+                                    {{ config.last_months_filter if config.last_months_filter > 0 else 'Disabled' }}
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                name="last_months_filter"
+                                min="0"
+                                max="24"
+                                value="{{ config.last_months_filter }}"
+                                class="w-full"
+                                oninput="document.getElementById('time-filter-value').textContent = this.value == 0 ? 'Disabled' : this.value; updateImpactMeter()"
+                            >
+                            <p class="text-xs text-slate-500 mt-1">Only use artists played in last N months (0 = disabled)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Options -->
+                <div class="border-t border-slate-200 pt-6 mt-6">
+                    <h3 class="text-sm font-semibold text-slate-900 mb-4">Output Options</h3>
+
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                <input
+                                    type="checkbox"
+                                    {% if config.generate_html_visualisation %}checked{% endif %}
+                                    class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                                >
+                            </div>
+                            <div class="ml-3">
+                                <label class="text-sm font-medium text-slate-700">Generate HTML Visualisation</label>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                <input
+                                    type="checkbox"
+                                    {% if config.create_apple_music_playlist %}checked{% endif %}
+                                    class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                                >
+                            </div>
+                            <div class="ml-3">
+                                <label class="text-sm font-medium text-slate-700">Create Apple Music Playlist</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right Column: Visualisations -->
+    <div class="space-y-6">
+        <!-- Scoring Weights Chart -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h3 class="text-sm font-semibold text-slate-900 mb-4">Scoring Weight Distribution</h3>
+            <div id="weight-chart-container">
+                {% set rarity = config.rarity_preference %}
+                {% include 'partials/weight_chart.html' %}
+            </div>
+        </div>
+
+        <!-- Tag Profile Cloud -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h3 class="text-sm font-semibold text-slate-900 mb-4">Taste Profile Tags</h3>
+            <div id="tag-cloud-container">
+                {% set enabled = config.enable_tag_similarity %}
+                {% set blacklisted_tags = [] %}
+                {% include 'partials/tag_cloud.html' %}
+            </div>
+        </div>
+
+        <!-- Impact Meter -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h3 class="text-sm font-semibold text-slate-900 mb-4">Recommendation Scope</h3>
+            <div id="impact-meter-container">
+                {% set narrowness = 30 %}
+                {% set impact_text = "Balanced" %}
+                {% include 'partials/impact_meter.html' %}
+            </div>
+        </div>
+
+        <!-- Preview Results -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h3 class="text-sm font-semibold text-slate-900 mb-4">Preview (Top 5)</h3>
+            <div id="preview-container">
+                <!-- Will be populated by HTMX on first slider change, or show empty state -->
+                <div class="text-center py-8 text-slate-400">
+                    <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                    </svg>
+                    <p class="text-sm">Preview will appear here</p>
+                    <p class="text-xs mt-1">Adjust settings to see recommendations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update impact meter with current form values
+    function updateImpactMeter() {
+        const formData = new FormData(document.getElementById('config-form'));
+
+        fetch('/update-impact-meter', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('impact-meter-container').innerHTML = html;
+        });
+    }
+
+    // Update all dynamic elements (for combined updates)
+    function updateAllDynamicElements() {
+        updateImpactMeter();
+    }
+
+    // Initial load of dynamic elements
+    document.addEventListener('DOMContentLoaded', () => {
+        updateImpactMeter();
+
+        // Trigger initial preview load
+        const formData = new FormData(document.getElementById('config-form'));
+        fetch('/preview-recommendations', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('preview-container').innerHTML = html;
+        });
+    });
+</script>
+{% endblock %}
