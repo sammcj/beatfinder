@@ -70,6 +70,65 @@ class AppleMusicScraper:
         self.playwright = None
         self.browser = None
 
+    @staticmethod
+    def _normalize_artist_name(name: str) -> str:
+        """
+        Normalise artist name for comparison by:
+        - Converting to lowercase
+        - Removing special characters
+        - Normalising whitespace
+        - Handling common variations (feat., &, and)
+        """
+        if not name:
+            return ""
+
+        # Convert to lowercase
+        name = name.lower()
+
+        # Remove common punctuation and special chars
+        name = re.sub(r'[.$\'\"]', '', name)
+
+        # Normalise separators: & → and
+        name = re.sub(r'\s*&\s*', ' and ', name)
+
+        # Remove "feat.", "ft.", "featuring" variations
+        name = re.sub(r'\s+(feat\.|ft\.|featuring)\s+.+$', '', name)
+
+        # Normalise whitespace (multiple spaces to single space, trim)
+        name = re.sub(r'\s+', ' ', name).strip()
+
+        return name
+
+    @staticmethod
+    def _calculate_name_similarity(expected: str, found: str) -> float:
+        """
+        Calculate similarity score between two artist names.
+        Returns 1.0 for exact match, lower scores for partial matches.
+        """
+        expected_norm = AppleMusicScraper._normalize_artist_name(expected)
+        found_norm = AppleMusicScraper._normalize_artist_name(found)
+
+        if not expected_norm or not found_norm:
+            return 0.0
+
+        # Exact match after normalisation
+        if expected_norm == found_norm:
+            return 1.0
+
+        # Check if one contains the other
+        if expected_norm in found_norm or found_norm in expected_norm:
+            # Calculate overlap ratio
+            shorter = min(len(expected_norm), len(found_norm))
+            longer = max(len(expected_norm), len(found_norm))
+            return shorter / longer
+
+        # Calculate simple character overlap
+        expected_chars = set(expected_norm)
+        found_chars = set(found_norm)
+        overlap = len(expected_chars & found_chars)
+        total = len(expected_chars | found_chars)
+        return overlap / total if total > 0 else 0.0
+
     def __enter__(self):
         self.playwright = sync_playwright().start()
         self.browser = self.playwright.chromium.launch(headless=self.headless)
@@ -103,13 +162,43 @@ class AppleMusicScraper:
             page.goto(search_url, wait_until="networkidle", timeout=30000)
             page.wait_for_timeout(3000)
 
-            # Find first artist link and navigate to artist page
-            first_artist = page.query_selector('a[href*="/artist/"]')
-            if not first_artist:
+            # Find all artist links and verify name match before clicking
+            artist_links = page.query_selector_all('a[href*="/artist/"]')
+            if not artist_links:
                 page.close()
+                print(f"  ⚠ No artist results found for '{artist_name}'")
                 return {'artist_url': None, 'songs': []}
 
-            artist_url = first_artist.get_attribute('href')
+            # Score each artist link by name similarity
+            best_match = None
+            best_score = 0.0
+            SIMILARITY_THRESHOLD = 0.7  # Require 70% similarity
+
+            for link in artist_links:
+                # Extract artist name from link text or aria-label
+                link_text = link.inner_text().strip()
+                aria_label = link.get_attribute('aria-label')
+
+                # Try both text sources
+                found_name = link_text if link_text else (aria_label if aria_label else "")
+
+                if found_name:
+                    # Calculate similarity
+                    score = self._calculate_name_similarity(artist_name, found_name)
+
+                    if score > best_score:
+                        best_score = score
+                        best_match = link
+
+            # Check if we found a good enough match
+            if not best_match or best_score < SIMILARITY_THRESHOLD:
+                page.close()
+                found_names = [link.inner_text().strip() for link in artist_links[:3]]
+                print(f"  ⚠ No good artist name match for '{artist_name}' (best: {best_score:.2f}, found: {found_names})")
+                return {'artist_url': None, 'songs': []}
+
+            # Get URL and navigate to artist page
+            artist_url = best_match.get_attribute('href')
             if not artist_url.startswith('http'):
                 artist_url = f"https://music.apple.com{artist_url}"
 
