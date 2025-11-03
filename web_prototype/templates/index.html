@@ -1133,6 +1133,26 @@
         input.click();
     }
 
+    // Reset to defaults
+    function resetToDefaults() {
+        if (!confirm('Reset all settings to defaults from .env? Current session settings will be cleared.')) {
+            return;
+        }
+
+        fetch('/reset-to-defaults', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error resetting settings: ' + error.message);
+            });
+    }
+
     // Load settings from run history
     function loadRunSettings(runId) {
         if (!confirm('Load settings from this run? Current settings will be replaced.')) {

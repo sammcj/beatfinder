@@ -689,6 +689,20 @@ def load_run_settings(run_id):
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/reset-to-defaults', methods=['POST'])
+def reset_to_defaults():
+    """Clear session to reset all settings to .env defaults"""
+    try:
+        # Clear the entire session
+        session.clear()
+        return jsonify({
+            'success': True,
+            'message': 'Settings reset to defaults'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/save-tags-to-env', methods=['POST'])
 def save_tags_to_env():
     """Save tag blacklist, ignore list, and top N setting to .env file"""
