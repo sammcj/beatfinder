@@ -548,12 +548,18 @@ def generate_recommendations_stream():
                                     validated_data[artist] = songs
 
                         if validated_data:
+                            # Count total songs
+                            total_songs = sum(len(songs.get('songs', [])) for songs in validated_data.values())
+
                             # Create actual Apple Music playlist using web API
                             playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE)
                             if playlist_id:
                                 playlist_created = True
-                                playlist_message = f"Created Apple Music playlist with {len(validated_data)} songs"
-                                progress_callback("phase", playlist_message, 0, 0)
+                                playlist_message = (
+                                    f"Created Apple Music playlist with {total_songs} songs from {len(validated_data)} artists. "
+                                    f"Note: If songs don't appear, force quit and reopen Apple Music (sync can take 1-3 minutes)."
+                                )
+                                progress_callback("phase", f"Playlist created with {total_songs} songs", 0, 0)
                             else:
                                 playlist_message = "Could not create Apple Music playlist (tokens may need refreshing)"
                         else:
@@ -593,8 +599,8 @@ def generate_recommendations_stream():
                 # Send heartbeat to keep connection alive
                 yield f": keepalive\n\n"
 
-        # Wait for thread to fully complete
-        thread.join(timeout=5)
+        # Wait for thread to fully complete (no timeout since we know it's done when None is in queue)
+        thread.join()
 
         # Send final result
         if result_holder['success']:
