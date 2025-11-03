@@ -83,7 +83,7 @@ python beatfinder.py --rarity 9                # Adjust rarity preference (1-15)
 - Uses `RateLimiter` class for thread-safe rate limiting across concurrent requests
 - Caches all API responses with configurable expiry (7 days default)
 - Methods:
-  - `get_similar_artists()`: Fetch similar artists with tags
+  - `get_similar_artists()`: Fetch similar artists (without tags for performance)
   - `get_artist_tags()`: Get top genre tags for an artist
   - `get_artist_info()`: Get detailed stats (listeners, play count)
 

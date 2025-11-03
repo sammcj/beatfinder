@@ -9,8 +9,10 @@ from pathlib import Path
 # Add parent directory to path so we can import beatfinder modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response, stream_with_context
 import json
+import queue
+import threading
 from datetime import datetime, timedelta
 
 # Import real BeatFinder classes
@@ -390,101 +392,138 @@ def update_impact_meter():
                          impact_text=impact_text)
 
 
-@app.route('/generate-recommendations', methods=['POST'])
-def generate_recommendations():
-    """Generate recommendations with current settings"""
+@app.route('/generate-recommendations-stream', methods=['GET'])
+def generate_recommendations_stream():
+    """Generate recommendations with real-time progress updates via SSE"""
     config = get_current_config()
 
-    # Get time filter from request
-    time_filter = request.form.get('time_filter', '')
+    # Get time filter from request args (GET params)
+    time_filter = request.args.get('time_filter', '')
 
     # Store in session
     session['time_filter'] = time_filter
 
-    try:
-        # Get library and create engine
-        library = get_library_parser()
-        artist_stats = library.get_artist_stats()
-        library_stats = library.get_library_stats()
+    def generate():
+        progress_queue = queue.Queue()
+        result_holder = {'success': False, 'data': None, 'error': None}
 
-        # Filter artist stats by time range if provided
-        if time_filter:
-            from datetime import datetime, timedelta
-
-            # Calculate cutoff date
-            cutoff_date = None
-            if time_filter == '7d':
-                cutoff_date = datetime.now() - timedelta(days=7)
-            elif time_filter == '1m':
-                cutoff_date = datetime.now() - timedelta(days=30)
-            elif time_filter == '3m':
-                cutoff_date = datetime.now() - timedelta(days=90)
-            elif time_filter == '6m':
-                cutoff_date = datetime.now() - timedelta(days=180)
-            elif time_filter == '12m':
-                cutoff_date = datetime.now() - timedelta(days=365)
-            elif time_filter == '2y':
-                cutoff_date = datetime.now() - timedelta(days=730)
-            elif time_filter == '5y':
-                cutoff_date = datetime.now() - timedelta(days=1825)
-
-            if cutoff_date:
-                filtered_stats = {}
-
-                for artist, stats in artist_stats.items():
-                    last_played = stats.get('last_played')
-                    if not last_played:
-                        continue
-
-                    try:
-                        if isinstance(last_played, str):
-                            last_played_date = datetime.fromisoformat(last_played.replace('Z', '+00:00'))
-                        else:
-                            last_played_date = last_played
-
-                        if last_played_date >= cutoff_date:
-                            filtered_stats[artist] = stats
-                    except (ValueError, AttributeError):
-                        # Include artists with invalid/missing dates
-                        filtered_stats[artist] = stats
-
-                artist_stats = filtered_stats
-
-        lastfm = LastFmClient(LASTFM_API_KEY)
-        engine = RecommendationEngine(artist_stats, lastfm)
-
-        # Generate recommendations
-        recommendations = engine.generate_recommendations(rarity_pref=config['rarity_preference'])
-
-        if not recommendations:
-            return jsonify({
-                'success': False,
-                'error': 'No recommendations found. Try adjusting your settings or date range.'
+        def progress_callback(event_type, message, current=0, total=0):
+            """Callback for progress updates"""
+            progress_queue.put({
+                'type': event_type,
+                'message': message,
+                'current': current,
+                'total': total,
+                'percent': int((current / total * 100)) if total > 0 else 0
             })
 
-        # Filter rejected artists
-        recommendations = filter_rejected_from_recommendations(recommendations)
+        def run_generation():
+            """Run recommendation generation in background thread"""
+            try:
+                # Get library and create engine
+                library = get_library_parser()
+                artist_stats = library.get_artist_stats()
+                library_stats = library.get_library_stats()
 
-        # Save to cache
-        loved_artists = engine.get_loved_artists()
-        save_recommendations_cache(recommendations, loved_artists, config['rarity_preference'])
+                # Filter artist stats by time range if provided
+                if time_filter:
+                    from datetime import datetime, timedelta
 
-        # Save to run history
-        save_run_history(config, len(recommendations))
+                    # Calculate cutoff date
+                    cutoff_date = None
+                    if time_filter == '7d':
+                        cutoff_date = datetime.now() - timedelta(days=7)
+                    elif time_filter == '1m':
+                        cutoff_date = datetime.now() - timedelta(days=30)
+                    elif time_filter == '3m':
+                        cutoff_date = datetime.now() - timedelta(days=90)
+                    elif time_filter == '6m':
+                        cutoff_date = datetime.now() - timedelta(days=180)
+                    elif time_filter == '12m':
+                        cutoff_date = datetime.now() - timedelta(days=365)
+                    elif time_filter == '2y':
+                        cutoff_date = datetime.now() - timedelta(days=730)
+                    elif time_filter == '5y':
+                        cutoff_date = datetime.now() - timedelta(days=1825)
 
-        return jsonify({
-            'success': True,
-            'count': len(recommendations),
-            'preview': recommendations[:5],
-            'filtered_artists': len(artist_stats) if time_filter else None,
-            'time_filter': time_filter
-        })
+                    if cutoff_date:
+                        filtered_stats = {}
 
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
+                        for artist, stats in artist_stats.items():
+                            last_played = stats.get('last_played')
+                            if not last_played:
+                                continue
+
+                            try:
+                                if isinstance(last_played, str):
+                                    last_played_date = datetime.fromisoformat(last_played.replace('Z', '+00:00'))
+                                else:
+                                    last_played_date = last_played
+
+                                if last_played_date >= cutoff_date:
+                                    filtered_stats[artist] = stats
+                            except (ValueError, AttributeError):
+                                # Include artists with invalid/missing dates
+                                filtered_stats[artist] = stats
+
+                        artist_stats = filtered_stats
+
+                lastfm = LastFmClient(LASTFM_API_KEY)
+                engine = RecommendationEngine(artist_stats, lastfm, progress_callback=progress_callback)
+
+                # Generate recommendations
+                recommendations = engine.generate_recommendations(rarity_pref=config['rarity_preference'])
+
+                if not recommendations:
+                    result_holder['success'] = False
+                    result_holder['error'] = 'No recommendations found. Try adjusting your settings or date range.'
+                    return
+
+                # Filter rejected artists
+                recommendations = filter_rejected_from_recommendations(recommendations)
+
+                # Save to cache
+                loved_artists = engine.get_loved_artists()
+                save_recommendations_cache(recommendations, loved_artists, config['rarity_preference'])
+
+                # Save to run history
+                save_run_history(config, len(recommendations))
+
+                result_holder['success'] = True
+                result_holder['data'] = {
+                    'count': len(recommendations),
+                    'preview': recommendations[:5],
+                    'filtered_artists': len(artist_stats) if time_filter else None,
+                    'time_filter': time_filter
+                }
+
+            except Exception as e:
+                result_holder['success'] = False
+                result_holder['error'] = str(e)
+            finally:
+                progress_queue.put(None)  # Signal completion
+
+        # Start generation in background thread
+        thread = threading.Thread(target=run_generation)
+        thread.start()
+
+        # Stream progress updates
+        while True:
+            try:
+                progress = progress_queue.get(timeout=30)
+                if progress is None:  # Completion signal
+                    break
+                yield f"data: {json.dumps(progress)}\n\n"
+            except queue.Empty:
+                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+
+        # Send final result
+        if result_holder['success']:
+            yield f"data: {json.dumps({'type': 'complete', 'data': result_holder['data']})}\n\n"
+        else:
+            yield f"data: {json.dumps({'type': 'error', 'error': result_holder['error']})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 @app.route('/clear-cache', methods=['POST'])

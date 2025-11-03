@@ -805,7 +805,7 @@
         sessionStorage.setItem('tag_blacklist_top_n', value);
     }
 
-    function updateProcessingStatus(status, message) {
+    function updateProcessingStatus(status, message, progress = null) {
         const statusDiv = document.getElementById('processing-status');
         let icon, color;
 
@@ -827,12 +827,24 @@
                 color = 'bg-slate-100 text-slate-600';
         }
 
+        let progressBar = '';
+        if (progress && progress.total > 0) {
+            const percent = Math.round((progress.current / progress.total) * 100);
+            progressBar = `
+                <div class="w-full bg-slate-200 rounded-full h-2 mt-2">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${percent}%"></div>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">${progress.current} / ${progress.total}</p>
+            `;
+        }
+
         statusDiv.innerHTML = `
             <div class="text-center py-4">
                 <div class="w-10 h-10 mx-auto mb-2 rounded-full ${color} flex items-center justify-center">
                     ${icon}
                 </div>
                 <p class="text-xs font-medium text-slate-900">${message}</p>
+                ${progressBar}
             </div>
         `;
     }
@@ -842,55 +854,79 @@
         button.disabled = true;
         button.textContent = 'Generating...';
 
-        updateProcessingStatus('processing', 'Generating recommendations...');
+        updateProcessingStatus('processing', 'Initialising...');
 
+        // Prepare form data
         const formData = new FormData(document.getElementById('config-form'));
+        const params = new URLSearchParams(formData);
 
-        fetch('/generate-recommendations', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            button.disabled = false;
-            button.textContent = 'Generate Recommendations';
+        // Use EventSource for SSE
+        const eventSource = new EventSource(`/generate-recommendations-stream?${params}`);
 
-            if (data.success) {
-                let message = `Generated ${data.count} recommendations!`;
-                if (data.filtered_artists && data.time_filter) {
-                    const filterLabels = {
-                        '7d': 'last 7 days',
-                        '1m': 'last month',
-                        '3m': 'last 3 months',
-                        '6m': 'last 6 months',
-                        '12m': 'last year',
-                        '2y': 'last 2 years',
-                        '5y': 'last 5 years'
-                    };
-                    message += ` (${data.filtered_artists} artists from ${filterLabels[data.time_filter] || 'time filter'})`;
-                }
-                updateProcessingStatus('success', message);
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
 
-                fetch('/preview-recommendations', {
-                    method: 'POST',
-                    body: new FormData(document.getElementById('config-form'))
-                })
-                .then(response => response.text())
-                .then(html => {
-                    document.getElementById('preview-container').innerHTML = html;
-                });
+            switch(data.type) {
+                case 'phase':
+                    updateProcessingStatus('processing', data.message);
+                    break;
+                case 'progress':
+                    updateProcessingStatus('processing', data.message, {
+                        current: data.current,
+                        total: data.total
+                    });
+                    break;
+                case 'complete':
+                    eventSource.close();
+                    button.disabled = false;
+                    button.textContent = 'Generate Recommendations';
 
-                refreshRunHistory();
-                cachedMarkdown = '';
-            } else {
-                updateProcessingStatus('error', `Error: ${data.error}`);
+                    let message = `Generated ${data.data.count} recommendations!`;
+                    if (data.data.filtered_artists && data.data.time_filter) {
+                        const filterLabels = {
+                            '7d': 'last 7 days',
+                            '1m': 'last month',
+                            '3m': 'last 3 months',
+                            '6m': 'last 6 months',
+                            '12m': 'last year',
+                            '2y': 'last 2 years',
+                            '5y': 'last 5 years'
+                        };
+                        message += ` (${data.data.filtered_artists} artists from ${filterLabels[data.data.time_filter] || 'time filter'})`;
+                    }
+                    updateProcessingStatus('success', message);
+
+                    // Refresh preview
+                    fetch('/preview-recommendations', {
+                        method: 'POST',
+                        body: new FormData(document.getElementById('config-form'))
+                    })
+                    .then(response => response.text())
+                    .then(html => {
+                        document.getElementById('preview-container').innerHTML = html;
+                    });
+
+                    refreshRunHistory();
+                    cachedMarkdown = '';
+                    break;
+                case 'error':
+                    eventSource.close();
+                    button.disabled = false;
+                    button.textContent = 'Generate Recommendations';
+                    updateProcessingStatus('error', `Error: ${data.error}`);
+                    break;
+                case 'heartbeat':
+                    // Keep-alive, do nothing
+                    break;
             }
-        })
-        .catch(error => {
+        };
+
+        eventSource.onerror = function(error) {
+            eventSource.close();
             button.disabled = false;
             button.textContent = 'Generate Recommendations';
-            updateProcessingStatus('error', `Error: ${error.message}`);
-        });
+            updateProcessingStatus('error', 'Connection error. Please try again.');
+        };
     }
 
     function clearCache() {

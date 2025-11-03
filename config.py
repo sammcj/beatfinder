@@ -32,11 +32,11 @@ LOVED_MIN_ARTIST_PLAYS = int(os.getenv("LOVED_MIN_ARTIST_PLAYS", "10"))
 LIB_DISLIKED_MIN_TRACK_COUNT = int(os.getenv("LIB_DISLIKED_MIN_TRACK_COUNT", "2"))  # Min disliked tracks to filter artist
 
 # Cache settings
-CACHE_EXPIRY_DAYS = int(os.getenv("CACHE_EXPIRY_DAYS", "7"))
-REC_CACHE_EXPIRY_DAYS = int(os.getenv("REC_CACHE_EXPIRY_DAYS", "7"))
+CACHE_EXPIRY_DAYS = int(os.getenv("CACHE_EXPIRY_DAYS", "30"))
+REC_CACHE_EXPIRY_DAYS = int(os.getenv("REC_CACHE_EXPIRY_DAYS", "30"))
 
 # Rarity preference
-RARITY_PREFERENCE = int(os.getenv("RARITY_PREFERENCE", "7"))
+RARITY_PREFERENCE = int(os.getenv("RARITY_PREFERENCE", "9"))
 
 # Validate rarity preference
 if not 1 <= RARITY_PREFERENCE <= 15:

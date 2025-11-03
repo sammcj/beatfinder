@@ -101,6 +101,10 @@ class LastFmClient:
             with open(self.cache_file, 'w') as f:
                 json.dump(self.cache, f, indent=2)
 
+    def save_cache(self):
+        """Public method to save cache (for batch saving after operations)"""
+        self._save_cache()
+
     def _make_request(self, params: Dict) -> Dict:
         """Make API request with global rate limiting"""
         params["api_key"] = self.api_key
@@ -122,7 +126,12 @@ class LastFmClient:
             return {}
 
     def get_similar_artists(self, artist_name: str, limit: int = 20) -> List[Dict]:
-        """Get similar artists from Last.fm (thread-safe)"""
+        """
+        Get similar artists from Last.fm (thread-safe)
+
+        Returns artists WITHOUT tags for performance - fetch tags separately
+        in parallel to avoid sequential API calls bottleneck.
+        """
         cache_key = f"similar_{artist_name.lower()}"
 
         with self.cache_lock:
@@ -146,12 +155,11 @@ class LastFmClient:
                     "listeners": int(artist.get("listeners", 0)) if "listeners" in artist else 0,
                 })
 
-        for artist in similar:
-            artist["tags"] = self.get_artist_tags(artist["name"])
+        # Don't fetch tags here - let the caller decide when/if to fetch them
+        # This allows parallel tag fetching instead of sequential
 
         with self.cache_lock:
             self.cache["data"][cache_key] = similar
-        self._save_cache()
 
         return similar
 
@@ -177,7 +185,6 @@ class LastFmClient:
 
         with self.cache_lock:
             self.cache["data"][cache_key] = tags
-        self._save_cache()
 
         return tags
 
@@ -207,7 +214,6 @@ class LastFmClient:
 
         with self.cache_lock:
             self.cache["data"][cache_key] = info
-        self._save_cache()
 
         return info
 
@@ -215,9 +221,10 @@ class LastFmClient:
 class RecommendationEngine:
     """Generate artist recommendations"""
 
-    def __init__(self, library_stats: Dict, lastfm_client: LastFmClient):
+    def __init__(self, library_stats: Dict, lastfm_client: LastFmClient, progress_callback=None):
         self.library_stats = library_stats
         self.lastfm = lastfm_client
+        self.progress_callback = progress_callback  # Callback for progress updates
         self.known_artists = set(
             self._normalise_artist_name(artist)
             for artist, stats in library_stats.items()
@@ -312,6 +319,8 @@ class RecommendationEngine:
             return {}
 
         print("Building music taste profile from your loved artists...")
+        if self.progress_callback:
+            self.progress_callback("phase", "Building music taste profile", len(loved_artists))
 
         tag_counts = defaultdict(float)
         total_tags = 0
@@ -346,6 +355,10 @@ class RecommendationEngine:
                         if failed > 0:
                             status += f" ({failed} failed)"
                         print(status + "...")
+                        if self.progress_callback:
+                            self.progress_callback("progress", f"Analysing taste profile: {completed}/{len(loved_artists)}", completed, len(loved_artists))
+                        # Save cache periodically (allows resume if interrupted)
+                        self.lastfm.save_cache()
 
                 except Exception:
                     failed += 1
@@ -380,6 +393,8 @@ class RecommendationEngine:
         """Generate artist recommendations"""
         loved_artists = self.get_loved_artists()
         print(f"Analysing {len(loved_artists)} loved/frequently played artists...")
+        if self.progress_callback:
+            self.progress_callback("phase", f"Analysing {len(loved_artists)} loved/frequently played artists", len(loved_artists))
         if self.disliked_artists:
             print(f"Filtering {len(self.disliked_artists)} disliked artists from recommendations")
 
@@ -397,6 +412,7 @@ class RecommendationEngine:
             similar = self.lastfm.get_similar_artists(artist)
             return artist, similar
 
+        # Phase 1: Fetch similar artists (parallelised)
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
             futures = {executor.submit(fetch_similar, artist): artist for artist in loved_artists}
 
@@ -412,6 +428,10 @@ class RecommendationEngine:
                         if failed > 0:
                             status += f" ({failed} failed)"
                         print(status + "...")
+                        if self.progress_callback:
+                            self.progress_callback("progress", f"Finding similar artists: {completed}/{len(loved_artists)}", completed, len(loved_artists))
+                        # Save cache periodically (allows resume if interrupted)
+                        self.lastfm.save_cache()
 
                     for sim_artist in similar:
                         name = sim_artist["name"]
@@ -437,7 +457,6 @@ class RecommendationEngine:
                         recommendations[name]["recommended_by"].append(artist)
                         recommendations[name]["match_scores"].append(sim_artist["match"])
                         recommendations[name]["listeners"] = sim_artist.get("listeners", 0)
-                        recommendations[name]["tags"].update(sim_artist.get("tags", []))
 
                         if ENABLE_PLAY_FREQUENCY_WEIGHTING:
                             recommender_play_count = self.library_stats.get(artist, {}).get("play_count", 1)
@@ -446,7 +465,36 @@ class RecommendationEngine:
                     failed += 1
                     continue
 
+        # Phase 2: Fetch tags for all recommended artists (parallelised)
+        print(f"\nFetching tags for {len(recommendations)} potential recommendations...")
+        if self.progress_callback:
+            self.progress_callback("phase", f"Fetching tags for {len(recommendations)} artists", len(recommendations))
+
+        def fetch_tags(artist_name: str) -> tuple:
+            tags = self.lastfm.get_artist_tags(artist_name)
+            return artist_name, tags
+
+        with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
+            tag_futures = {executor.submit(fetch_tags, name): name for name in recommendations.keys()}
+
+            completed = 0
+            for future in as_completed(tag_futures):
+                try:
+                    artist_name, tags = future.result()
+                    recommendations[artist_name]["tags"] = set(tags)
+                    completed += 1
+
+                    if completed % 100 == 0 or completed == len(recommendations):
+                        if self.progress_callback:
+                            self.progress_callback("progress", f"Fetching tags: {completed}/{len(recommendations)}", completed, len(recommendations))
+                        # Save cache periodically
+                        self.lastfm.save_cache()
+                except Exception:
+                    continue
+
         print(f"\nFound {len(recommendations)} potential recommendations")
+        if self.progress_callback:
+            self.progress_callback("phase", f"Scoring {len(recommendations)} potential recommendations", len(recommendations))
 
         # Filter out artists with blacklisted tags
         if REC_TAG_BLACKLIST:
