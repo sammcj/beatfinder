@@ -14,11 +14,11 @@ from apple_music_integration import create_apple_music_playlist_with_scraping
 from apple_music_web_api import create_beatfinder_playlist
 from config import (
     APPLE_EXPORT_DIR,
-    APPLE_MUSIC_SCRAPE_BATCH_SIZE,
+    AM_SCRAPE_BATCH_SIZE,
     CACHE_DIR,
-    CREATE_APPLE_MUSIC_PLAYLIST,
-    ENABLE_INTERACTIVE_FILTERING,
-    GENERATE_HTML_VISUALISATION,
+    CREATE_PLAYLIST,
+    CLI_INTERACTIVE_FILTERING,
+    HTML_VISUALISATION,
     LASTFM_API_KEY,
     MAX_RECOMMENDATIONS,
     PLAYLIST_MERGE_MODE,
@@ -111,7 +111,7 @@ def format_recommendations(recommendations: List[Dict], limit: int, artist_music
     return "".join(output)
 
 
-def generate_html_visualisation(recommendations: List[Dict], loved_artists: List[str], limit: int, artist_music_data: Dict[str, Dict] = None, library_stats: Dict = None) -> bool:
+def HTML_VISUALISATION(recommendations: List[Dict], loved_artists: List[str], limit: int, artist_music_data: Dict[str, Dict] = None, library_stats: Dict = None) -> bool:
     """
     Generate an interactive HTML visualisation showing recommendation connections
 
@@ -125,7 +125,7 @@ def generate_html_visualisation(recommendations: List[Dict], loved_artists: List
     Returns:
         True if successful, False otherwise
     """
-    if not GENERATE_HTML_VISUALISATION:
+    if not HTML_VISUALISATION:
         return False
 
     output_file = Path("recommendations_visualisation.html")
@@ -816,7 +816,7 @@ def main():
         engine = RecommendationEngine(artist_stats, lastfm)
         loved_artists = engine.get_loved_artists()
 
-        generate_html_visualisation(recommendations, loved_artists, args.limit, None, library_stats)
+        HTML_VISUALISATION(recommendations, loved_artists, args.limit, None, library_stats)
         return
 
     # Try to load cached recommendations first
@@ -856,7 +856,7 @@ def main():
         return
 
     # Show interactive filter if enabled (and not disabled via flag)
-    if ENABLE_INTERACTIVE_FILTERING and not args.no_interactive:
+    if CLI_INTERACTIVE_FILTERING and not args.no_interactive:
         try:
             recommendations = show_interactive_filter(recommendations, args.limit)
             if not recommendations:
@@ -867,7 +867,7 @@ def main():
 
     # Create Apple Music playlist if enabled (with web scraping)
     artist_music_data = {}
-    if CREATE_APPLE_MUSIC_PLAYLIST:
+    if CREATE_PLAYLIST:
         # Sort recommendations by primary genre tag for smoother playlist listening
         # Group by primary tag, then by score within each group
         sorted_for_playlist = sorted(
@@ -879,7 +879,7 @@ def main():
             sorted_for_playlist,
             args.limit,
             PLAYLIST_SONGS_PER_ARTIST,
-            APPLE_MUSIC_SCRAPE_BATCH_SIZE
+            AM_SCRAPE_BATCH_SIZE
         )
         artist_music_data = result.get('artist_data', {})
 
@@ -921,7 +921,7 @@ def main():
 
     # Generate HTML visualisation if enabled
     loved_artists = engine.get_loved_artists()
-    generate_html_visualisation(recommendations, loved_artists, args.limit, artist_music_data, library_stats)
+    HTML_VISUALISATION(recommendations, loved_artists, args.limit, artist_music_data, library_stats)
 
     # Save run to history file (for web UI)
     save_run_to_history(args.limit, args.rarity, len(recommendations))

@@ -29,11 +29,11 @@ LOVED_MIN_TRACK_RATING = int(os.getenv("LOVED_MIN_TRACK_RATING", "4"))  # 1-5 st
 LOVED_MIN_ARTIST_PLAYS = int(os.getenv("LOVED_MIN_ARTIST_PLAYS", "10"))
 
 # Disliked artist filtering
-DISLIKED_MIN_TRACK_COUNT = int(os.getenv("DISLIKED_MIN_TRACK_COUNT", "2"))  # Min disliked tracks to filter artist
+LIB_DISLIKED_MIN_TRACK_COUNT = int(os.getenv("LIB_DISLIKED_MIN_TRACK_COUNT", "2"))  # Min disliked tracks to filter artist
 
 # Cache settings
 CACHE_EXPIRY_DAYS = int(os.getenv("CACHE_EXPIRY_DAYS", "7"))
-RECOMMENDATIONS_CACHE_EXPIRY_DAYS = int(os.getenv("RECOMMENDATIONS_CACHE_EXPIRY_DAYS", "7"))
+REC_CACHE_EXPIRY_DAYS = int(os.getenv("REC_CACHE_EXPIRY_DAYS", "7"))
 
 # Rarity preference
 RARITY_PREFERENCE = int(os.getenv("RARITY_PREFERENCE", "7"))
@@ -53,37 +53,45 @@ ENABLE_PLAY_FREQUENCY_WEIGHTING = os.getenv("ENABLE_PLAY_FREQUENCY_WEIGHTING", "
 LAST_MONTHS_FILTER = int(os.getenv("LAST_MONTHS_FILTER", "0"))
 
 # Tag similarity ignore list - tags ignored when calculating similarity scores (not for filtering)
-TAG_SIMILARITY_IGNORE_LIST_RAW = os.getenv("TAG_SIMILARITY_IGNORE_LIST", "")
-TAG_SIMILARITY_IGNORE_LIST = set(tag.strip().lower() for tag in TAG_SIMILARITY_IGNORE_LIST_RAW.split(",") if tag.strip())
+TAG_SIMILARITY_IGNORE_LIST_RAW = os.getenv("LIB_TAG_IGNORE_LIST", "")
+LIB_TAG_IGNORE_LIST = set(tag.strip().lower() for tag in TAG_SIMILARITY_IGNORE_LIST_RAW.split(",") if tag.strip())
 
 # Tag blacklist - completely filter out artists with these tags from recommendations
-TAG_BLACKLIST_RAW = os.getenv("TAG_BLACKLIST", "")
-TAG_BLACKLIST = set(tag.strip().lower() for tag in TAG_BLACKLIST_RAW.split(",") if tag.strip())
+TAG_BLACKLIST_RAW = os.getenv("REC_TAG_BLACKLIST", "")
+REC_TAG_BLACKLIST = set(tag.strip().lower() for tag in TAG_BLACKLIST_RAW.split(",") if tag.strip())
 
 # Tag blacklist top N tags - only check top N tags when filtering (0 or "all" = check all tags)
-TAG_BLACKLIST_TOP_N_TAGS_RAW = os.getenv("TAG_BLACKLIST_TOP_N_TAGS", "all").strip().lower()
-if TAG_BLACKLIST_TOP_N_TAGS_RAW in ["all", "0", ""]:
-    TAG_BLACKLIST_TOP_N_TAGS = 0  # 0 means check all tags
+RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW = os.getenv("REC_TAG_BLACKLIST_TOP_N_TAGS", "all").strip().lower()
+if RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW in ["all", "0", ""]:
+    REC_TAG_BLACKLIST_TOP_N_TAGS = 0  # 0 means check all tags
 else:
     try:
-        TAG_BLACKLIST_TOP_N_TAGS = int(TAG_BLACKLIST_TOP_N_TAGS_RAW)
-        if TAG_BLACKLIST_TOP_N_TAGS < 0:
-            TAG_BLACKLIST_TOP_N_TAGS = 0
+        REC_TAG_BLACKLIST_TOP_N_TAGS = int(RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW)
+        if REC_TAG_BLACKLIST_TOP_N_TAGS < 0:
+            REC_TAG_BLACKLIST_TOP_N_TAGS = 0
     except ValueError:
-        print(f"Warning: Invalid TAG_BLACKLIST_TOP_N_TAGS value '{TAG_BLACKLIST_TOP_N_TAGS_RAW}', using 'all'")
-        TAG_BLACKLIST_TOP_N_TAGS = 0
+        print(f"Warning: Invalid REC_TAG_BLACKLIST_TOP_N_TAGS value '{RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW}', using 'all'")
+        REC_TAG_BLACKLIST_TOP_N_TAGS = 0
+
+# Exclude from taste profile - artists in library that won't be used to generate recommendations
+LIBRARY_EXCLUDE_FROM_TASTE_PROFILE_RAW = os.getenv("LIB_ARTISTS_IGNORE", "")
+LIB_ARTISTS_IGNORE = [artist.strip() for artist in LIBRARY_EXCLUDE_FROM_TASTE_PROFILE_RAW.split(",") if artist.strip()]
+
+# Artist blacklist - artists that will never be recommended
+RECOMMENDED_ARTISTS_BLACKLIST_RAW = os.getenv("REC_ARTISTS_BLACKLIST", "")
+REC_ARTISTS_BLACKLIST = [artist.strip() for artist in RECOMMENDED_ARTISTS_BLACKLIST_RAW.split(",") if artist.strip()]
 
 # Apple Music playlist creation
-CREATE_APPLE_MUSIC_PLAYLIST = os.getenv("CREATE_APPLE_MUSIC_PLAYLIST", "false").lower() == "true"
+CREATE_PLAYLIST = os.getenv("CREATE_PLAYLIST", "false").lower() == "true"
 PLAYLIST_SONGS_PER_ARTIST = int(os.getenv("PLAYLIST_SONGS_PER_ARTIST", "3"))
-APPLE_MUSIC_SCRAPE_BATCH_SIZE = int(os.getenv("APPLE_MUSIC_SCRAPE_BATCH_SIZE", "5"))
+AM_SCRAPE_BATCH_SIZE = int(os.getenv("AM_SCRAPE_BATCH_SIZE", "5"))
 PLAYLIST_MERGE_MODE = os.getenv("PLAYLIST_MERGE_MODE", "true").lower() == "true"
 
 # Interactive filtering
-ENABLE_INTERACTIVE_FILTERING = os.getenv("ENABLE_INTERACTIVE_FILTERING", "true").lower() == "true"
+CLI_INTERACTIVE_FILTERING = os.getenv("CLI_INTERACTIVE_FILTERING", "true").lower() == "true"
 
 # HTML visualisation
-GENERATE_HTML_VISUALISATION = os.getenv("GENERATE_HTML_VISUALISATION", "false").lower() == "true"
+HTML_VISUALISATION = os.getenv("HTML_VISUALISATION", "false").lower() == "true"
 
 # Scoring weights (when advanced features enabled)
 SCORING_FREQUENCY_WEIGHT = float(os.getenv("SCORING_FREQUENCY_WEIGHT", "0.3"))
@@ -115,10 +123,10 @@ def show_config():
     print(f"    - {LOVED_PLAY_COUNT_THRESHOLD}+ plays, OR")
     print(f"    - {LOVED_MIN_TRACK_RATING}+ star rating with {LOVED_MIN_ARTIST_PLAYS}+ plays")
     print(f"  'Disliked' (filtered from recommendations):")
-    print(f"    - {DISLIKED_MIN_TRACK_COUNT}+ disliked tracks AND no loved tracks")
+    print(f"    - {LIB_DISLIKED_MIN_TRACK_COUNT}+ disliked tracks AND no loved tracks")
     print(f"\nRarity preference: {RARITY_PREFERENCE}")
     print(f"Last.fm cache expiry: {CACHE_EXPIRY_DAYS} days")
-    print(f"Recommendations cache expiry: {RECOMMENDATIONS_CACHE_EXPIRY_DAYS} days")
+    print(f"Recommendations cache expiry: {REC_CACHE_EXPIRY_DAYS} days")
 
     # Show advanced features if enabled
     advanced_features = []
@@ -128,7 +136,7 @@ def show_config():
         advanced_features.append("Play frequency weighting")
     if LAST_MONTHS_FILTER > 0:
         advanced_features.append(f"Time filter: last {LAST_MONTHS_FILTER} months")
-    if CREATE_APPLE_MUSIC_PLAYLIST:
+    if CREATE_PLAYLIST:
         advanced_features.append(f"Create playlist ({PLAYLIST_SONGS_PER_ARTIST} songs per artist)")
 
     if advanced_features:
@@ -137,10 +145,10 @@ def show_config():
             print(f"  • {feature}")
 
     # Show tag filters if any
-    if TAG_BLACKLIST:
-        top_n_desc = f" (top {TAG_BLACKLIST_TOP_N_TAGS} tags only)" if TAG_BLACKLIST_TOP_N_TAGS > 0 else " (all tags)"
-        print(f"\nBlacklisted tags{top_n_desc}: {', '.join(sorted(TAG_BLACKLIST))}")
-    if TAG_SIMILARITY_IGNORE_LIST:
-        print(f"Similarity ignored tags (not used for scoring): {', '.join(sorted(TAG_SIMILARITY_IGNORE_LIST))}")
+    if REC_TAG_BLACKLIST:
+        top_n_desc = f" (top {REC_TAG_BLACKLIST_TOP_N_TAGS} tags only)" if REC_TAG_BLACKLIST_TOP_N_TAGS > 0 else " (all tags)"
+        print(f"\nBlacklisted tags{top_n_desc}: {', '.join(sorted(REC_TAG_BLACKLIST))}")
+    if LIB_TAG_IGNORE_LIST:
+        print(f"Similarity ignored tags (not used for scoring): {', '.join(sorted(LIB_TAG_IGNORE_LIST))}")
 
     print("="*60 + "\n")

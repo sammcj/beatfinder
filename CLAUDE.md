@@ -141,7 +141,7 @@ USE_APPLE_EXPORT=false  # Use iTunes Library XML (alternative)
 
 **"Disliked" Artists** (filtered from recommendations AND excluded from taste profile):
 - **Apple Music Export:** Artists with explicit "DISLIKE" in Favorites.csv AND no loved tracks
-- **iTunes Library XML:** Artists with `DISLIKED_MIN_TRACK_COUNT`+ disliked tracks AND no loved tracks
+- **iTunes Library XML:** Artists with `LIB_DISLIKED_MIN_TRACK_COUNT`+ disliked tracks AND no loved tracks
 - These artists are completely excluded: they won't be recommended, and they won't be used to generate recommendations
 - Apple Music export provides explicit dislike data from user preferences
 
@@ -157,7 +157,7 @@ USE_APPLE_EXPORT=false  # Use iTunes Library XML (alternative)
 2. **Recommendations cache** (`cache/recommendations_cache.json`)
    - Caches scored/ranked recommendations
    - Invalidated if rarity preference changes or cache expires
-   - Expiry: `RECOMMENDATIONS_CACHE_EXPIRY_DAYS`
+   - Expiry: `REC_CACHE_EXPIRY_DAYS`
    - Cleared with `--refresh-recommendations` or `--refresh-all`
 
 3. **Library cache** (location depends on data source)
@@ -217,11 +217,11 @@ All settings in `.env` (copy from `.env.example`):
 - `ENABLE_TAG_SIMILARITY`: Match genre tags to taste profile
 - `ENABLE_PLAY_FREQUENCY_WEIGHTING`: Weight by play counts
 - `LAST_MONTHS_FILTER`: Time-based filtering in months, 0=disabled
-- `TAG_SIMILARITY_IGNORE_LIST`: Comma-separated tags excluded from similarity scoring (artists with these tags can still be recommended)
-- `TAG_BLACKLIST`: Comma-separated tags that completely filter out artists
-- `TAG_BLACKLIST_TOP_N_TAGS`: Check only top N tags for blacklist (0/"all"=check all tags, 1-20=check top N only). Lower values allow artists with minor blacklisted tags.
-- `CREATE_APPLE_MUSIC_PLAYLIST`: Auto-create playlist
-- `GENERATE_HTML_VISUALISATION`: Generate interactive graph
+- `LIB_TAG_IGNORE_LIST`: Comma-separated tags excluded from similarity scoring (artists with these tags can still be recommended)
+- `REC_TAG_BLACKLIST`: Comma-separated tags that completely filter out artists
+- `REC_TAG_BLACKLIST_TOP_N_TAGS`: Check only top N tags for blacklist (0/"all"=check all tags, 1-20=check top N only). Lower values allow artists with minor blacklisted tags.
+- `CREATE_PLAYLIST`: Auto-create playlist
+- `HTML_VISUALISATION`: Generate interactive graph
 
 ## Output Files
 
@@ -317,26 +317,26 @@ All settings in `.env` (copy from `.env.example`):
 
 ### Tag Filtering - Two Distinct Approaches
 
-**TAG_SIMILARITY_IGNORE_LIST** (scoring exclusion):
+**LIB_TAG_IGNORE_LIST** (scoring exclusion):
 - Excludes specific tags from taste profile building and similarity calculations
 - Artists with these tags can still be recommended
 - Use case: Generic/broad tags that don't help narrow down taste (e.g., "american", "female vocalists", "alternative")
 - Example: Artist tagged "electronic, pop, ambient" with "pop" in ignore list → "electronic" and "ambient" still contribute to similarity scoring
 
-**TAG_BLACKLIST** (complete filtering):
+**REC_TAG_BLACKLIST** (complete filtering):
 - Completely filters out any artist with blacklisted tags from recommendations
 - Artists are removed after similar artist collection, before scoring
 - Use case: Genres/styles you absolutely don't want (e.g., "pop", "country", "christmas")
 - Example: Artist tagged "indie pop, dreamy" with "pop" in blacklist → completely filtered out, never recommended
 - Filtering happens in `generate_recommendations()` at line 450-465
 
-**TAG_BLACKLIST_TOP_N_TAGS** (selective blacklist filtering):
-- Controls how many tags to check when applying TAG_BLACKLIST
+**REC_TAG_BLACKLIST_TOP_N_TAGS** (selective blacklist filtering):
+- Controls how many tags to check when applying REC_TAG_BLACKLIST
 - 0 or "all" (default): Check all tags (most restrictive, current behaviour)
 - 1: Only filter if blacklisted tag is the artist's #1 tag
 - 3-10: Only filter if blacklisted tag is in top N tags
 - Use case: Allow artists with minor/low-weight blacklisted tags whilst still filtering primary matches
-- Example: Artist tagged "electronic(100), ambient(54), experimental(34), pop(2)" with TAG_BLACKLIST="pop" and TAG_BLACKLIST_TOP_N_TAGS=3 → artist is NOT filtered (pop is 4th tag, outside top 3)
+- Example: Artist tagged "electronic(100), ambient(54), experimental(34), pop(2)" with REC_TAG_BLACKLIST="pop" and REC_TAG_BLACKLIST_TOP_N_TAGS=3 → artist is NOT filtered (pop is 4th tag, outside top 3)
 - Tags are already sorted by Last.fm weight (100 = most popular tag for that artist)
 - Lower N values = more permissive (allow artists with minor blacklisted tags)
 - Higher N values = more restrictive (approach "all tags" behaviour)

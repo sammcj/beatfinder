@@ -25,15 +25,17 @@ from config import (
     LOVED_PLAY_COUNT_THRESHOLD,
     LOVED_MIN_TRACK_RATING,
     LOVED_MIN_ARTIST_PLAYS,
-    DISLIKED_MIN_TRACK_COUNT,
+    LIB_DISLIKED_MIN_TRACK_COUNT,
     ENABLE_TAG_SIMILARITY,
     ENABLE_PLAY_FREQUENCY_WEIGHTING,
     LAST_MONTHS_FILTER,
-    TAG_SIMILARITY_IGNORE_LIST,
-    TAG_BLACKLIST,
-    TAG_BLACKLIST_TOP_N_TAGS,
-    CREATE_APPLE_MUSIC_PLAYLIST,
-    GENERATE_HTML_VISUALISATION,
+    LIB_TAG_IGNORE_LIST,
+    REC_TAG_BLACKLIST,
+    REC_TAG_BLACKLIST_TOP_N_TAGS,
+    LIB_ARTISTS_IGNORE,
+    REC_ARTISTS_BLACKLIST,
+    CREATE_PLAYLIST,
+    HTML_VISUALISATION,
     CACHE_DIR,
 )
 from library_parser import AppleMusicLibrary
@@ -162,17 +164,17 @@ def get_current_config():
         'loved_play_count_threshold': session.get('loved_play_count_threshold', LOVED_PLAY_COUNT_THRESHOLD),
         'loved_min_track_rating': session.get('loved_min_track_rating', LOVED_MIN_TRACK_RATING),
         'loved_min_artist_plays': session.get('loved_min_artist_plays', LOVED_MIN_ARTIST_PLAYS),
-        'disliked_min_track_count': session.get('disliked_min_track_count', DISLIKED_MIN_TRACK_COUNT),
+        'LIB_DISLIKED_MIN_TRACK_COUNT': session.get('LIB_DISLIKED_MIN_TRACK_COUNT', LIB_DISLIKED_MIN_TRACK_COUNT),
         'enable_tag_similarity': session.get('enable_tag_similarity', ENABLE_TAG_SIMILARITY),
         'enable_play_frequency_weighting': session.get('enable_play_frequency_weighting', ENABLE_PLAY_FREQUENCY_WEIGHTING),
         'last_months_filter': session.get('last_months_filter', LAST_MONTHS_FILTER),
-        'tag_similarity_ignore_list': list(session.get('tag_similarity_ignore_list', TAG_SIMILARITY_IGNORE_LIST)),
-        'tag_blacklist': list(session.get('tag_blacklist', TAG_BLACKLIST)),
-        'tag_blacklist_top_n_tags': session.get('tag_blacklist_top_n_tags', TAG_BLACKLIST_TOP_N_TAGS),
-        'artist_blacklist': session.get('artist_blacklist', []),
-        'exclude_from_taste_profile': session.get('exclude_from_taste_profile', []),
-        'create_apple_music_playlist': session.get('create_apple_music_playlist', CREATE_APPLE_MUSIC_PLAYLIST),
-        'generate_html_visualisation': session.get('generate_html_visualisation', GENERATE_HTML_VISUALISATION),
+        'LIB_TAG_IGNORE_LIST': list(session.get('LIB_TAG_IGNORE_LIST', LIB_TAG_IGNORE_LIST)),
+        'REC_TAG_BLACKLIST': list(session.get('REC_TAG_BLACKLIST', REC_TAG_BLACKLIST)),
+        'REC_TAG_BLACKLIST_TOP_N_TAGS': session.get('REC_TAG_BLACKLIST_TOP_N_TAGS', REC_TAG_BLACKLIST_TOP_N_TAGS),
+        'REC_ARTISTS_BLACKLIST': session.get('REC_ARTISTS_BLACKLIST', REC_ARTISTS_BLACKLIST),
+        'LIB_ARTISTS_IGNORE': session.get('LIB_ARTISTS_IGNORE', LIB_ARTISTS_IGNORE),
+        'CREATE_PLAYLIST': session.get('CREATE_PLAYLIST', CREATE_PLAYLIST),
+        'HTML_VISUALISATION': session.get('HTML_VISUALISATION', HTML_VISUALISATION),
         'use_apple_export': USE_APPLE_EXPORT,
         'apple_export_dir': APPLE_EXPORT_DIR,
     }
@@ -312,15 +314,15 @@ def update_tag_profile():
     """Update tag profile visualisation"""
     enable_tags = request.form.get('enable_tag_similarity') == 'true'
     ignore_list_str = request.form.get('tag_ignore_list', '')
-    blacklist_str = request.form.get('tag_blacklist', '')
+    blacklist_str = request.form.get('REC_TAG_BLACKLIST', '')
 
     # Parse tag lists
     ignore_list = [t.strip().lower() for t in ignore_list_str.split(',') if t.strip()]
     blacklist = [t.strip().lower() for t in blacklist_str.split(',') if t.strip()]
 
     session['enable_tag_similarity'] = enable_tags
-    session['tag_similarity_ignore_list'] = ignore_list
-    session['tag_blacklist'] = blacklist
+    session['LIB_TAG_IGNORE_LIST'] = ignore_list
+    session['REC_TAG_BLACKLIST'] = blacklist
 
     try:
         library = get_library_parser()
@@ -364,7 +366,7 @@ def preview_recommendations():
 @app.route('/update-impact-meter', methods=['POST'])
 def update_impact_meter():
     """Calculate recommendation scope impact"""
-    blacklist_str = request.form.get('tag_blacklist', '')
+    blacklist_str = request.form.get('REC_TAG_BLACKLIST', '')
     blacklist_count = len([t for t in blacklist_str.split(',') if t.strip()])
     time_filter = int(request.form.get('last_months_filter', 0))
     loved_threshold = int(request.form.get('loved_play_count', LOVED_PLAY_COUNT_THRESHOLD))
@@ -623,7 +625,7 @@ def get_visualisation():
     else:
         return jsonify({
             'success': False,
-            'error': 'Visualisation not found. Enable GENERATE_HTML_VISUALISATION and regenerate recommendations.'
+            'error': 'Visualisation not found. Enable HTML_VISUALISATION and regenerate recommendations.'
         })
 
 
@@ -707,7 +709,7 @@ def reset_to_defaults():
 def save_tags_to_env():
     """Save tag blacklist, ignore list, and top N setting to .env file"""
     try:
-        tag_blacklist = request.json.get('tag_blacklist', [])
+        REC_TAG_BLACKLIST = request.json.get('REC_TAG_BLACKLIST', [])
         tag_ignore_list = request.json.get('tag_ignore_list', [])
         tag_blacklist_top_n = request.json.get('tag_blacklist_top_n', '0')
 
@@ -734,25 +736,25 @@ def save_tags_to_env():
         top_n_updated = False
 
         for line in lines:
-            if line.startswith('TAG_BLACKLIST='):
-                updated_lines.append(f'TAG_BLACKLIST={",".join(tag_blacklist)}\n')
+            if line.startswith('REC_TAG_BLACKLIST='):
+                updated_lines.append(f'REC_TAG_BLACKLIST={",".join(REC_TAG_BLACKLIST)}\n')
                 blacklist_updated = True
-            elif line.startswith('TAG_SIMILARITY_IGNORE_LIST='):
-                updated_lines.append(f'TAG_SIMILARITY_IGNORE_LIST={",".join(tag_ignore_list)}\n')
+            elif line.startswith('LIB_TAG_IGNORE_LIST='):
+                updated_lines.append(f'LIB_TAG_IGNORE_LIST={",".join(tag_ignore_list)}\n')
                 ignore_updated = True
-            elif line.startswith('TAG_BLACKLIST_TOP_N_TAGS='):
-                updated_lines.append(f'TAG_BLACKLIST_TOP_N_TAGS={top_n_value}\n')
+            elif line.startswith('REC_TAG_BLACKLIST_TOP_N_TAGS='):
+                updated_lines.append(f'REC_TAG_BLACKLIST_TOP_N_TAGS={top_n_value}\n')
                 top_n_updated = True
             else:
                 updated_lines.append(line)
 
         # If tags weren't found, append them
         if not blacklist_updated:
-            updated_lines.append(f'\nTAG_BLACKLIST={",".join(tag_blacklist)}\n')
+            updated_lines.append(f'\nTAG_BLACKLIST={",".join(REC_TAG_BLACKLIST)}\n')
         if not ignore_updated:
-            updated_lines.append(f'TAG_SIMILARITY_IGNORE_LIST={",".join(tag_ignore_list)}\n')
+            updated_lines.append(f'LIB_TAG_IGNORE_LIST={",".join(tag_ignore_list)}\n')
         if not top_n_updated:
-            updated_lines.append(f'TAG_BLACKLIST_TOP_N_TAGS={top_n_value}\n')
+            updated_lines.append(f'REC_TAG_BLACKLIST_TOP_N_TAGS={top_n_value}\n')
 
         # Write back to .env
         with open(env_path, 'w') as f:

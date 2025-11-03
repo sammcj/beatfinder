@@ -58,20 +58,382 @@
     </div>
 </div>
 
-<!-- Main 4-Column Layout -->
-<div class="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 gap-6">
+<form id="config-form">
 
-    <!-- Column 1: Main Settings -->
-    <div class="space-y-6">
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4">Core Settings</h2>
+<!-- Main Layout: 3 columns -->
+<div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
 
-            <form id="config-form">
-                <!-- Rarity Preference -->
-                <div class="mb-6">
+    <!-- Left Column: Stages 1 & 2 -->
+    <div class="space-y-4">
+
+        <!-- STAGE 1: INPUT -->
+        <div class="bg-white rounded-lg shadow-sm p-5 stage-input">
+            <div class="stage-header text-blue-700">
+                <span class="stage-number">1</span>
+                <span>Input → Data Source & Time Range</span>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Data Source -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-900 mb-3">Data Source</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-start">
+                            <input type="radio" name="data_source" value="apple_export"
+                                   {% if config.use_apple_export %}checked{% endif %}
+                                   class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300">
+                            <label class="ml-2 text-xs text-slate-700">
+                                <span class="font-medium">Apple Music Export</span>
+                                <div class="text-slate-500">Privacy export from privacy.apple.com (recommended)</div>
+                            </label>
+                        </div>
+                        <div class="flex items-start">
+                            <input type="radio" name="data_source" value="itunes_xml"
+                                   {% if not config.use_apple_export %}checked{% endif %}
+                                   class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300">
+                            <label class="ml-2 text-xs text-slate-700">
+                                <span class="font-medium">iTunes Library XML</span>
+                                <div class="text-slate-500">Local library only</div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="text-xs font-medium text-slate-700 block mb-1.5">Apple Music Export Directory</label>
+                        <div class="flex gap-2">
+                            <input type="text" value="{{ config.apple_export_dir }}"
+                                   class="flex-1 px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                   placeholder="Path to Apple Music Activity folder">
+                            <button class="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+                                Browse
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Time Filter -->
+                <div>
+                    <label class="text-xs font-semibold text-slate-900 block mb-3">Recent Listening Filter</label>
+                    <select name="time_filter" id="time-filter"
+                            class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            onchange="updateImpactMeter()">
+                        <option value="">Disabled (all time)</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="1m">Last month</option>
+                        <option value="3m">Last 3 months</option>
+                        <option value="6m">Last 6 months</option>
+                        <option value="12m">Last year</option>
+                        <option value="2y">Last 2 years</option>
+                        <option value="5y">Last 5 years</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1.5">Only use artists played within this time period</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- STAGE 2: TASTE PROFILE -->
+        <div class="bg-white rounded-lg shadow-sm p-5 stage-taste">
+            <div class="stage-header text-green-700">
+                <span class="stage-number">2</span>
+                <span>Taste Profile → Define Your Preferences</span>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Loved Artist Threshold & Toggles -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-xs font-medium text-slate-700">Min Plays for Taste Profile</label>
+                            <span id="loved-play-value" class="text-xs font-semibold text-green-600">{{ config.loved_play_count_threshold }}</span>
+                        </div>
+                        <input
+                            type="range"
+                            name="loved_play_count"
+                            min="2"
+                            max="100"
+                            step="1"
+                            value="{{ config.loved_play_count_threshold }}"
+                            oninput="document.getElementById('loved-play-value').textContent = this.value"
+                            hx-post="/update-artist-stats"
+                            hx-trigger="input changed delay:200ms"
+                            hx-target="#artist-stats-container"
+                            hx-include="[name='known_play_count'],[name='loved_play_count']">
+                        <p class="text-xs text-slate-500 mt-1.5">Artists with this many plays define your taste (Apple Music "liked" artists always included)</p>
+                    </div>
+
+                    <div class="space-y-3 pt-3 border-t border-slate-200">
+                        <div class="flex items-start">
+                            <input type="checkbox" name="enable_tag_similarity" id="enable-tags"
+                                   {% if config.enable_tag_similarity %}checked{% endif %}
+                                   class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300 rounded"
+                                   hx-post="/update-tag-profile"
+                                   hx-trigger="change"
+                                   hx-target="#tag-cloud-container"
+                                   hx-include="[name='tag_ignore_list'],[name='REC_TAG_BLACKLIST']"
+                                   hx-vals='js:{"enable_tag_similarity": document.getElementById("enable-tags").checked}'>
+                            <label for="enable-tags" class="ml-2 text-xs text-slate-700">
+                                <span class="font-medium">Tag Similarity Matching</span>
+                                <div class="text-slate-500 mt-0.5">Score recommendations by genre tag overlap with your profile</div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-start">
+                            <input type="checkbox" name="enable_play_frequency_weighting"
+                                   {% if config.enable_play_frequency_weighting %}checked{% endif %}
+                                   class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300 rounded">
+                            <label class="ml-2 text-xs text-slate-700">
+                                <span class="font-medium">Play Frequency Weighting</span>
+                                <div class="text-slate-500 mt-0.5">Weight recommendations from most-played artists more heavily</div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-start">
+                            <input type="checkbox" {% if config.CREATE_PLAYLIST %}checked{% endif %}
+                                   class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300 rounded">
+                            <label class="ml-2 text-xs text-slate-700">
+                                <span class="font-medium">Create Apple Music Playlist</span>
+                                <div class="text-slate-500 mt-0.5">Auto-create playlist with recommended songs</div>
+                            </label>
+                        </div>
+                    </div>
+
+                <!-- Tag Ignore List -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-900 mb-2">Tag Ignore List</h3>
+                    <p class="text-xs text-slate-500 mb-2">Tags excluded from similarity scoring (artists still recommended)</p>
+                    <div id="ignore-tags-container" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px] p-2 border border-slate-200 rounded-lg">
+                            {% for tag in config.LIB_TAG_IGNORE_LIST %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                {{ tag }}
+                                <button type="button" onclick="removeTag('ignore', '{{ tag }}')" class="ml-1 hover:text-slate-900">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </button>
+                            </span>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="tag_ignore_list" id="tag-ignore-input" value="{{ ','.join(config.LIB_TAG_IGNORE_LIST) }}">
+                    <div class="flex gap-1.5">
+                        <input type="text" id="custom-ignore-input" placeholder="Type tag and press Enter"
+                               class="flex-1 px-2 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomTag('ignore',this.value);this.value='';}">
+                        <button type="button" onclick="const input=document.getElementById('custom-ignore-input');addCustomTag('ignore',input.value);input.value='';"
+                                class="px-2 py-1 text-xs font-medium text-white bg-slate-600 rounded-lg hover:bg-slate-700">
+                            Add
+                        </button>
+                    </div>
+                    <details class="text-xs mt-2">
+                        <summary class="cursor-pointer text-slate-600 hover:text-slate-900 font-medium">
+                            Add from {{ all_tags|length }} available tags
+                        </summary>
+                        <div class="flex flex-wrap gap-1 mt-1.5 max-h-32 overflow-y-auto p-2 bg-slate-50 rounded">
+                            {% for tag in all_tags %}
+                            <button type="button" onclick="addTag('ignore', '{{ tag }}')"
+                                    class="px-1.5 py-0.5 text-xs bg-white border border-slate-200 rounded hover:border-slate-400 hover:bg-slate-100">
+                                + {{ tag }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Exclude from Taste Profile -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-900 mb-2">Exclude from Taste Profile</h3>
+                    <p class="text-xs text-slate-500 mb-2">Artists that won't be used to generate recommendations</p>
+                    <div id="exclude-artists-container" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px] p-2 border border-slate-200 rounded-lg">
+                            {% for artist in config.LIB_ARTISTS_IGNORE %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                {{ artist }}
+                                <button type="button" onclick="removeArtist('exclude', '{{ artist }}')" class="ml-1 hover:text-amber-900">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </button>
+                            </span>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="LIB_ARTISTS_IGNORE" id="exclude-artists-input" value="{{ ','.join(config.LIB_ARTISTS_IGNORE) }}">
+                    <div class="flex gap-1.5">
+                        <input type="text" id="custom-exclude-artist-input" placeholder="Type artist name and press Enter"
+                               class="flex-1 px-2 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomArtist('exclude',this.value);this.value='';}">
+                        <button type="button" onclick="const input=document.getElementById('custom-exclude-artist-input');addCustomArtist('exclude',input.value);input.value='';"
+                                class="px-2 py-1 text-xs font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700">
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Centre Column: Stages 3 & 4 -->
+    <div class="space-y-4">
+
+        <!-- STAGE 3: FILTERING -->
+        <div class="bg-white rounded-lg shadow-sm p-5 stage-filter">
+            <div class="stage-header text-orange-700">
+                <span class="stage-number">3</span>
+                <span>Filtering → Exclude Known & Disliked</span>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Known Artist Threshold -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-medium text-slate-700">Filter Artists With
+                            <span id="known-play-value" class="font-semibold text-red-600">{{ config.known_artist_min_play_count }}</span>+ Plays
+                        </label>
+                    </div>
+                    <input
+                        type="range"
+                        name="known_play_count"
+                        min="1"
+                        max="50"
+                        value="{{ config.known_artist_min_play_count }}"
+                        oninput="document.getElementById('known-play-value').textContent = this.value"
+                        hx-post="/update-artist-stats"
+                        hx-trigger="input changed delay:200ms"
+                        hx-target="#artist-stats-container"
+                        hx-include="[name='known_play_count'],[name='loved_play_count']">
+                    <div class="flex justify-between text-xs text-slate-500 mt-1">
+                        <span>Less filtering</span>
+                        <span>More filtering</span>
+                    </div>
+                    <div class="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600 leading-relaxed">
+                        Artists become "known" (filtered out) if:<br>
+                        • play_count ≥ this threshold OR<br>
+                        • track_count ≥ {{ config.known_artist_min_tracks }}
+                    </div>
+
+                    <div id="artist-stats-container" class="mt-3">
+                        {% set stats = {'loved_artists': library_stats.loved_artists, 'known_artists': library_stats.known_artists, 'disliked_artists': library_stats.disliked_artists} %}
+                        {% include 'partials/artist_stats.html' %}
+                    </div>
+                </div>
+
+                <!-- Artist Blacklist -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-900 mb-2">Artist Blacklist</h3>
+                    <p class="text-xs text-slate-500 mb-2">Never recommend these artists</p>
+                    <div id="blacklist-artists-container" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px] p-2 border border-slate-200 rounded-lg">
+                            {% for artist in config.REC_ARTISTS_BLACKLIST %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                                {{ artist }}
+                                <button type="button" onclick="removeArtist('blacklist', '{{ artist }}')" class="ml-1 hover:text-red-900">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </button>
+                            </span>
+                            {% endfor %}
+                    </div>
+                    <input type="hidden" name="REC_ARTISTS_BLACKLIST" id="artist-blacklist-input" value="{{ ','.join(config.REC_ARTISTS_BLACKLIST) }}">
+                    <div class="flex gap-1.5">
+                        <input type="text" id="custom-blacklist-artist-input" placeholder="Type artist name and press Enter"
+                               class="flex-1 px-2 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomArtist('blacklist',this.value);this.value='';}">
+                        <button type="button" onclick="const input=document.getElementById('custom-blacklist-artist-input');addCustomArtist('blacklist',input.value);input.value='';"
+                                class="px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tag Blacklist -->
+                <div>
                     <div class="flex items-center justify-between mb-2">
-                        <label class="text-sm font-medium text-slate-700">Rarity Preference</label>
-                        <span id="rarity-value" class="text-sm font-semibold text-primary-600">{{ config.rarity_preference }}</span>
+                        <h3 class="text-xs font-semibold text-slate-900">Tag Blacklist</h3>
+                        <button type="button" onclick="saveTagsToEnv('blacklist')"
+                                class="px-2 py-0.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50"
+                                title="Save to .env">
+                            💾
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-2">Artists with these tags are completely filtered out</p>
+
+                    <div class="mb-3 pb-3 border-b border-slate-200">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-xs font-medium text-slate-700">
+                                Check only top
+                                <span id="blacklist-top-n-value" class="font-semibold text-primary-600">{{ 'all' if config.REC_TAG_BLACKLIST_TOP_N_TAGS == 0 else config.REC_TAG_BLACKLIST_TOP_N_TAGS }}</span>
+                                tags
+                            </label>
+                        </div>
+                        <input
+                            type="range"
+                            name="tag_blacklist_top_n"
+                            id="blacklist-top-n-slider"
+                            min="0"
+                            max="20"
+                            value="{{ config.REC_TAG_BLACKLIST_TOP_N_TAGS }}"
+                            step="1"
+                            class="w-full"
+                            oninput="updateBlacklistTopN(this.value)"
+                        >
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
+                            <span>All tags</span>
+                            <span>Top 1 only</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1.5">
+                            Lower = more permissive (allow minor blacklisted tags)
+                        </p>
+                    </div>
+
+                    <div id="blacklist-tags-container" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px] p-2 border border-slate-200 rounded-lg">
+                        {% for tag in config.REC_TAG_BLACKLIST %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                            {{ tag }}
+                            <button type="button" onclick="removeTag('blacklist', '{{ tag }}')" class="ml-1 hover:text-red-900">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                            </button>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="REC_TAG_BLACKLIST" id="tag-blacklist-input" value="{{ ','.join(config.REC_TAG_BLACKLIST) }}">
+
+                    <div class="flex gap-1.5 mb-2">
+                        <input type="text" id="custom-blacklist-input" placeholder="Type tag and press Enter"
+                               class="flex-1 px-2 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomTag('blacklist',this.value);this.value='';}">
+                        <button type="button" onclick="const input=document.getElementById('custom-blacklist-input');addCustomTag('blacklist',input.value);input.value='';"
+                                class="px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
+                            Add
+                        </button>
+                    </div>
+
+                    <details class="text-xs">
+                        <summary class="cursor-pointer text-slate-600 hover:text-slate-900 font-medium">
+                            Add from {{ all_tags|length }} available tags
+                        </summary>
+                        <div class="flex flex-wrap gap-1 mt-1.5 max-h-32 overflow-y-auto p-2 bg-slate-50 rounded">
+                            {% for tag in all_tags %}
+                            <button type="button" onclick="addTag('blacklist', '{{ tag }}')"
+                                    class="px-1.5 py-0.5 text-xs bg-white border border-slate-200 rounded hover:border-red-300 hover:bg-red-50 hover:text-red-700">
+                                + {{ tag }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- STAGE 4: SCORING -->
+        <div class="bg-white rounded-lg shadow-sm p-5 stage-scoring">
+            <div class="stage-header text-purple-700">
+                <span class="stage-number">4</span>
+                <span>Scoring → Tune Algorithm Weights</span>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Rarity Preference -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-medium text-slate-700">Rarity Preference</label>
+                        <span id="rarity-value" class="text-xs font-semibold text-primary-600">{{ config.rarity_preference }}</span>
                     </div>
                     <input
                         type="range"
@@ -93,10 +455,10 @@
                 </div>
 
                 <!-- Max Recommendations -->
-                <div class="mb-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="text-sm font-medium text-slate-700">Max Recommendations</label>
-                        <span id="max-recs-value" class="text-sm font-semibold text-primary-600">{{ config.max_recommendations }}</span>
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-medium text-slate-700">Max Recommendations</label>
+                        <span id="max-recs-value" class="text-xs font-semibold text-primary-600">{{ config.max_recommendations }}</span>
                     </div>
                     <input
                         type="range"
@@ -107,462 +469,92 @@
                         value="{{ config.max_recommendations }}"
                         oninput="document.getElementById('max-recs-value').textContent = this.value"
                     >
-                </div>
-
-                <!-- Advanced Features Toggles -->
-                <div class="border-t border-slate-200 pt-4 mt-4 space-y-4">
-                    <div class="flex items-start">
-                        <input type="checkbox" name="enable_tag_similarity" id="enable-tags"
-                               {% if config.enable_tag_similarity %}checked{% endif %}
-                               class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300 rounded"
-                               hx-post="/update-tag-profile"
-                               hx-trigger="change"
-                               hx-target="#tag-cloud-container"
-                               hx-include="[name='tag_ignore_list'],[name='tag_blacklist']"
-                               hx-vals='js:{"enable_tag_similarity": document.getElementById("enable-tags").checked}'>
-                        <label for="enable-tags" class="ml-2 text-xs text-slate-700">
-                            <span class="font-medium">Tag Similarity Matching</span>
-                            <div class="text-slate-500 mt-1">Builds a genre tag profile from your loved artists (e.g., "electronic", "ambient", "techno") and scores recommendations based on how well their tags overlap with your profile. Recommendations with similar genre tags rank higher.</div>
-                        </label>
+                    <div class="flex justify-between text-xs text-slate-500 mt-1">
+                        <span>10</span>
+                        <span>200</span>
                     </div>
-
-                    <div class="flex items-start">
-                        <input type="checkbox" name="enable_play_frequency_weighting"
-                               {% if config.enable_play_frequency_weighting %}checked{% endif %}
-                               class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300 rounded">
-                        <label class="ml-2 text-xs text-slate-700">
-                            <span class="font-medium">Play Frequency Weighting</span>
-                            <div class="text-slate-500 mt-1">Weights recommendations from your most-played loved artists more heavily. If you've played an artist 100 times vs 10 times, recommendations from the frequently-played artist get higher scores.</div>
-                        </label>
-                    </div>
-
-                    <div class="flex items-start">
-                        <input type="checkbox" {% if config.create_apple_music_playlist %}checked{% endif %}
-                               class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300 rounded">
-                        <label class="ml-2 text-xs text-slate-700">
-                            <span class="font-medium">Create Apple Music Playlist</span>
-                            <div class="text-slate-500 mt-1">Automatically creates a playlist in Apple Music with songs from recommended artists.</div>
-                        </label>
-                    </div>
-
                 </div>
 
-                <!-- Time Filter -->
-                <div class="border-t border-slate-200 pt-4 mt-4">
-                    <label class="text-xs font-medium text-slate-700 block mb-2">Recent Listening Filter</label>
-                    <select name="time_filter" id="time-filter"
-                            class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            onchange="updateImpactMeter()">
-                        <option value="">Disabled (all time)</option>
-                        <option value="7d">Last 7 days</option>
-                        <option value="1m">Last month</option>
-                        <option value="3m">Last 3 months</option>
-                        <option value="6m">Last 6 months</option>
-                        <option value="12m">Last year</option>
-                        <option value="2y">Last 2 years</option>
-                        <option value="5y">Last 5 years</option>
-                    </select>
-                    <p class="text-xs text-slate-500 mt-2">Only use artists played within this time period for recommendations</p>
-                </div>
-            </form>
-        </div>
-
-        <!-- Data Source Configuration -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Data Source</h3>
-
-            <div class="space-y-3">
-                <div class="flex items-start">
-                    <input type="radio" name="data_source" value="apple_export"
-                           {% if config.use_apple_export %}checked{% endif %}
-                           class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300">
-                    <label class="ml-2 text-xs text-slate-700">
-                        <span class="font-medium">Apple Music Export</span>
-                        <div class="text-slate-500">Privacy export from privacy.apple.com (recommended)</div>
-                    </label>
-                </div>
-
-                <div class="flex items-start">
-                    <input type="radio" name="data_source" value="itunes_xml"
-                           {% if not config.use_apple_export %}checked{% endif %}
-                           class="w-4 h-4 mt-0.5 text-primary-600 border-slate-300">
-                    <label class="ml-2 text-xs text-slate-700">
-                        <span class="font-medium">iTunes Library XML</span>
-                        <div class="text-slate-500">Local library only</div>
-                    </label>
-                </div>
-            </div>
-
-            <div class="mt-4 pt-4 border-t border-slate-200">
-                <label class="text-xs font-medium text-slate-700 block mb-2">Apple Music Export Directory</label>
-                <div class="flex gap-2">
-                    <input type="text" value="{{ config.apple_export_dir }}"
-                           class="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                           placeholder="Path to Apple Music Activity folder">
-                    <button class="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
-                        Browse
-                    </button>
-                </div>
-                <p class="text-xs text-slate-500 mt-1">Location of your Apple Music privacy export</p>
-            </div>
-        </div>
-
-        <!-- Artist Classification Thresholds -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Artist Classification</h3>
-
-            <!-- Known Artist Threshold -->
-            <div class="mb-5 pb-4 border-b border-slate-200">
-                <div class="flex items-center justify-between mb-1">
-                    <label class="text-xs font-medium text-slate-700">Filter Artists With
-                        <span id="known-play-value" class="font-semibold text-red-600">{{ config.known_artist_min_play_count }}</span>+ Plays
-                    </label>
-                    <span class="text-xs text-slate-500">← Less filtering | More filtering →</span>
-                </div>
-                <input
-                    type="range"
-                    name="known_play_count"
-                    min="1"
-                    max="50"
-                    value="{{ config.known_artist_min_play_count }}"
-                    oninput="document.getElementById('known-play-value').textContent = this.value"
-                    hx-post="/update-artist-stats"
-                    hx-trigger="input changed delay:200ms"
-                    hx-target="#artist-stats-container"
-                    hx-include="[name='known_play_count'],[name='loved_play_count']">
-                <div class="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600 leading-relaxed">
-                    <strong>Known Artists</strong> = Artists you already know well enough that they're filtered OUT from recommendations<br>
-                    An artist becomes "known" if:<br>
-                    • play_count ≥ this threshold OR<br>
-                    • track_count ≥ {{ config.known_artist_min_tracks }}<br>
-                    <span class="text-slate-500 italic mt-1 block">Higher values = tolerate more plays before filtering = fewer artists filtered out</span>
-                </div>
-            </div>
-
-            <!-- Loved Artist Threshold -->
-            <div class="mb-5">
-                <div class="flex items-center justify-between mb-1">
-                    <label class="text-xs font-medium text-slate-700">Taste Profile: Min Plays to Include Artist</label>
-                    <span id="loved-play-value" class="text-xs font-semibold text-green-600">{{ config.loved_play_count_threshold }}</span>
-                </div>
-                <input
-                    type="range"
-                    name="loved_play_count"
-                    min="2"
-                    max="100"
-                    step="1"
-                    value="{{ config.loved_play_count_threshold }}"
-                    oninput="document.getElementById('loved-play-value').textContent = this.value"
-                    hx-post="/update-artist-stats"
-                    hx-trigger="input changed delay:200ms"
-                    hx-target="#artist-stats-container"
-                    hx-include="[name='known_play_count'],[name='loved_play_count']">
-                <div class="mt-2 p-2 bg-green-50 rounded text-xs text-slate-600 leading-relaxed">
-                    <strong>Loved Artists</strong> = Artists used to BUILD your taste profile (find similar artists)<br>
-                    <span class="text-slate-500 italic">This does NOT affect filtering. Apple Music "liked" artists always included.</span>
-                </div>
-            </div>
-
-            <!-- Summary Box -->
-            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-slate-700 leading-relaxed">
-                <strong class="text-blue-900">How These Work Together:</strong><br>
-                1. <strong>Loved Artists</strong> define your taste → used to find similar artists<br>
-                2. <strong>Known Artists</strong> are filtered OUT from final recommendations<br>
-                <span class="text-slate-500 italic">These are independent! Adjusting one doesn't affect the other.</span>
-            </div>
-
-            <!-- Dynamic Stats -->
-            <div id="artist-stats-container" class="mt-4">
-                {% set stats = {'loved_artists': library_stats.loved_artists, 'known_artists': library_stats.known_artists, 'disliked_artists': library_stats.disliked_artists} %}
-                {% include 'partials/artist_stats.html' %}
-            </div>
-        </div>
-
-        <!-- Exclude from Taste Profile -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Exclude from Taste Profile</h3>
-            <p class="text-xs text-slate-500 mb-3">Artists in your library that won't be used to generate recommendations (won't count as "loved" even if they meet criteria)</p>
-
-            <!-- Artist Chip Display -->
-            <div id="exclude-artists-container" class="flex flex-wrap gap-2 mb-3 min-h-[32px] p-2 border border-slate-200 rounded-lg">
-                {% for artist in config.exclude_from_taste_profile %}
-                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                    {{ artist }}
-                    <button type="button" onclick="removeArtist('exclude', '{{ artist }}')" class="ml-1.5 hover:text-amber-900">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </span>
-                {% endfor %}
-            </div>
-            <input type="hidden" name="exclude_from_taste_profile" id="exclude-artists-input" value="{{ ','.join(config.exclude_from_taste_profile) }}">
-
-            <!-- Custom Artist Input -->
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="custom-exclude-artist-input" placeholder="Type artist name and press Enter"
-                       class="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                       onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomArtist('exclude',this.value);this.value='';}">
-                <button onclick="const input=document.getElementById('custom-exclude-artist-input');addCustomArtist('exclude',input.value);input.value='';"
-                        class="px-3 py-2 text-xs font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700">
-                    Add Artist
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Column 2: Tag Management -->
-    <div class="space-y-6">
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
+                <!-- Scoring Weights Visualisation -->
                 <div>
-                    <h3 class="text-sm font-semibold text-slate-900">Tag Blacklist</h3>
-                    <p class="text-xs text-slate-500 mt-1">Artists with these tags are completely filtered out</p>
-                </div>
-                <button onclick="saveTagsToEnv('blacklist')"
-                        class="px-2 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50"
-                        title="Save current blacklist to .env file">
-                    💾 Save to .env
-                </button>
-            </div>
-
-            <!-- Top N Tags Filter -->
-            <div class="mb-4 pb-4 border-b border-slate-200">
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-xs font-medium text-slate-700">
-                        Check only top
-                        <span id="blacklist-top-n-value" class="font-semibold text-primary-600">{{ 'all' if config.tag_blacklist_top_n_tags == 0 else config.tag_blacklist_top_n_tags }}</span>
-                        tags
-                    </label>
-                    <span class="text-xs text-slate-500">More restrictive →</span>
-                </div>
-                <input
-                    type="range"
-                    name="tag_blacklist_top_n"
-                    id="blacklist-top-n-slider"
-                    min="0"
-                    max="20"
-                    value="{{ config.tag_blacklist_top_n_tags }}"
-                    step="1"
-                    class="w-full"
-                    oninput="updateBlacklistTopN(this.value)"
-                >
-                <div class="flex justify-between text-xs text-slate-500 mt-1">
-                    <span>All tags</span>
-                    <span>Top 1 only</span>
-                </div>
-                <p class="text-xs text-slate-500 mt-2">
-                    Lower values allow artists with minor blacklisted tags. Set to "all" for strictest filtering.
-                </p>
-            </div>
-
-            <!-- Tag Chip Input -->
-            <div id="blacklist-tags-container" class="flex flex-wrap gap-2 mb-3 min-h-[32px] p-2 border border-slate-200 rounded-lg">
-                {% for tag in config.tag_blacklist %}
-                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                    {{ tag }}
-                    <button type="button" onclick="removeTag('blacklist', '{{ tag }}')" class="ml-1.5 hover:text-red-900">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </span>
-                {% endfor %}
-            </div>
-            <input type="hidden" name="tag_blacklist" id="tag-blacklist-input" value="{{ ','.join(config.tag_blacklist) }}">
-
-            <!-- Custom Tag Input -->
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="custom-blacklist-input" placeholder="Type custom tag and press Enter"
-                       class="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                       onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomTag('blacklist',this.value);this.value='';}">
-                <button onclick="const input=document.getElementById('custom-blacklist-input');addCustomTag('blacklist',input.value);input.value='';"
-                        class="px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
-                    Add Tag
-                </button>
-            </div>
-
-            <!-- Tag Bucket -->
-            <details class="text-xs">
-                <summary class="cursor-pointer text-slate-600 hover:text-slate-900 font-medium mb-2">
-                    Click to add tags ({{ all_tags|length }} available)
-                </summary>
-                <div class="flex flex-wrap gap-1.5 mt-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded">
-                    {% for tag in all_tags %}
-                    <button type="button" onclick="addTag('blacklist', '{{ tag }}')"
-                            class="px-2 py-0.5 text-xs bg-white border border-slate-200 rounded hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        + {{ tag }}
-                    </button>
-                    {% endfor %}
-                </div>
-            </details>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h3 class="text-sm font-semibold text-slate-900">Tag Ignore List</h3>
-                    <p class="text-xs text-slate-500 mt-1">Tags excluded from similarity scoring (artists can still be recommended)</p>
-                </div>
-                <button onclick="saveTagsToEnv('ignore')"
-                        class="px-2 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50"
-                        title="Save current ignore list to .env file">
-                    💾 Save to .env
-                </button>
-            </div>
-
-            <!-- Tag Chip Input -->
-            <div id="ignore-tags-container" class="flex flex-wrap gap-2 mb-3 min-h-[32px] p-2 border border-slate-200 rounded-lg">
-                {% for tag in config.tag_similarity_ignore_list %}
-                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                    {{ tag }}
-                    <button type="button" onclick="removeTag('ignore', '{{ tag }}')" class="ml-1.5 hover:text-slate-900">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </span>
-                {% endfor %}
-            </div>
-            <input type="hidden" name="tag_ignore_list" id="tag-ignore-input" value="{{ ','.join(config.tag_similarity_ignore_list) }}">
-
-            <!-- Custom Tag Input -->
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="custom-ignore-input" placeholder="Type custom tag and press Enter"
-                       class="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                       onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomTag('ignore',this.value);this.value='';}">
-                <button onclick="const input=document.getElementById('custom-ignore-input');addCustomTag('ignore',input.value);input.value='';"
-                        class="px-3 py-2 text-xs font-medium text-white bg-slate-600 rounded-lg hover:bg-slate-700">
-                    Add Tag
-                </button>
-            </div>
-
-            <!-- Tag Bucket -->
-            <details class="text-xs">
-                <summary class="cursor-pointer text-slate-600 hover:text-slate-900 font-medium mb-2">
-                    Click to add tags
-                </summary>
-                <div class="flex flex-wrap gap-1.5 mt-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded">
-                    {% for tag in all_tags %}
-                    <button type="button" onclick="addTag('ignore', '{{ tag }}')"
-                            class="px-2 py-0.5 text-xs bg-white border border-slate-200 rounded hover:border-slate-400 hover:bg-slate-100 transition-colors">
-                        + {{ tag }}
-                    </button>
-                    {% endfor %}
-                </div>
-            </details>
-        </div>
-
-        <!-- Artist Blacklist -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Artist Blacklist</h3>
-            <p class="text-xs text-slate-500 mb-3">Artists that will never be recommended</p>
-
-            <!-- Artist Chip Display -->
-            <div id="blacklist-artists-container" class="flex flex-wrap gap-2 mb-3 min-h-[32px] p-2 border border-slate-200 rounded-lg">
-                {% for artist in config.artist_blacklist %}
-                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                    {{ artist }}
-                    <button type="button" onclick="removeArtist('blacklist', '{{ artist }}')" class="ml-1.5 hover:text-red-900">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </span>
-                {% endfor %}
-            </div>
-            <input type="hidden" name="artist_blacklist" id="artist-blacklist-input" value="{{ ','.join(config.artist_blacklist) }}">
-
-            <!-- Custom Artist Input -->
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="custom-blacklist-artist-input" placeholder="Type artist name and press Enter"
-                       class="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                       onkeypress="if(event.key==='Enter'){event.preventDefault();addCustomArtist('blacklist',this.value);this.value='';}">
-                <button onclick="const input=document.getElementById('custom-blacklist-artist-input');addCustomArtist('blacklist',input.value);input.value='';"
-                        class="px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
-                    Add Artist
-                </button>
-            </div>
-        </div>
-
-        <!-- Preview Results -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Preview (Top 5)</h3>
-            <div id="preview-container">
-                <div class="text-center py-8 text-slate-400">
-                    <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
-                    </svg>
-                    <p class="text-sm">Adjust settings to preview</p>
+                    <h3 class="text-xs font-medium text-slate-700 mb-1.5">Scoring Weights</h3>
+                    <div id="weight-chart-container">
+                        {% set rarity = config.rarity_preference %}
+                        {% include 'partials/weight_chart.html' %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Column 3: Visualisations -->
-    <div class="space-y-6">
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Scoring Weights</h3>
-            <div id="weight-chart-container">
-                {% set rarity = config.rarity_preference %}
-                {% include 'partials/weight_chart.html' %}
-            </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Taste Profile Tags</h3>
+    <!-- Right Column: Visualisations & Status -->
+    <div class="space-y-4">
+        <!-- Taste Profile Tags -->
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h3 class="text-xs font-semibold text-slate-900 mb-3">Taste Profile Tags</h3>
             <div id="tag-cloud-container">
                 {% set enabled = config.enable_tag_similarity %}
-                {% set blacklisted_tags = config.tag_blacklist %}
+                {% set blacklisted_tags = config.REC_TAG_BLACKLIST %}
                 {% include 'partials/tag_cloud.html' %}
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Recommendation Scope</h3>
+        <!-- Recommendation Scope -->
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h3 class="text-xs font-semibold text-slate-900 mb-3">Recommendation Scope</h3>
             <div id="impact-meter-container">
                 {% set narrowness = 30 %}
                 {% set impact_text = "Balanced" %}
                 {% include 'partials/impact_meter.html' %}
             </div>
         </div>
-    </div>
 
-    <!-- Column 4: Status & History -->
-    <div class="space-y-6">
-        <!-- Processing Status -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Processing Status</h3>
-            <div id="processing-status">
+        <!-- Preview Results -->
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h3 class="text-xs font-semibold text-slate-900 mb-3">Preview (Top 5)</h3>
+            <div id="preview-container">
                 <div class="text-center py-6 text-slate-400">
-                    <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="mx-auto h-10 w-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                    </svg>
+                    <p class="text-xs">Adjust settings to preview</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Status -->
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h3 class="text-xs font-semibold text-slate-900 mb-3">Processing Status</h3>
+            <div id="processing-status">
+                <div class="text-center py-4 text-slate-400">
+                    <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-100 flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                         </svg>
                     </div>
-                    <p class="text-sm">Ready</p>
-                    <p class="text-xs mt-1">Click Generate to start</p>
+                    <p class="text-xs font-medium">Ready</p>
+                    <p class="text-xs mt-0.5">Click Generate to start</p>
                 </div>
             </div>
         </div>
 
         <!-- Previous Runs -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-sm font-semibold text-slate-900 mb-4">Previous Runs</h3>
-            <div id="previous-runs-container" class="space-y-2">
+        <div class="bg-white rounded-lg shadow-sm p-4">
+            <h3 class="text-xs font-semibold text-slate-900 mb-3">Previous Runs</h3>
+            <div id="previous-runs-container" class="space-y-1.5">
                 {% if previous_runs %}
                     {% for run in previous_runs[:5] %}
                     <button
                         onclick="loadRunSettings({{ run.id }})"
-                        class="w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                        class="w-full text-left px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
                         title="Click to load these settings">
                         <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-1.5">
                                 <div class="text-xs font-medium text-slate-900">
                                     {{ run.timestamp.split(' ')[1] }}
                                 </div>
                                 {% if run.get('source') == 'CLI' %}
-                                <span class="px-1.5 py-0.5 text-xs bg-slate-100 text-slate-600 rounded">CLI</span>
+                                <span class="px-1 py-0.5 text-xs bg-slate-100 text-slate-600 rounded">CLI</span>
                                 {% endif %}
                             </div>
                             <span class="text-xs text-slate-500">{{ run.recommendations_count }} recs</span>
@@ -573,12 +565,14 @@
                     </button>
                     {% endfor %}
                 {% else %}
-                <p class="text-xs text-slate-400 text-center py-4">No runs yet</p>
+                <p class="text-xs text-slate-400 text-center py-3">No runs yet</p>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+</form>
 
 </div>
 <!-- End Configuration Tab -->
@@ -602,7 +596,6 @@
         </div>
 
         <div id="results-content" class="prose prose-sm max-w-none">
-            <!-- Results will load here -->
             <div id="results-placeholder" class="text-center py-12 text-slate-400">
                 <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -613,7 +606,6 @@
         </div>
     </div>
 </div>
-<!-- End Results Tab -->
 
 <!-- Visualisation Tab Content -->
 <div id="tab-content-visualisation" class="tab-content hidden">
@@ -637,7 +629,6 @@
         </div>
     </div>
 </div>
-<!-- End Visualisation Tab -->
 
 <!-- Run Details Modal (Hidden) -->
 <div id="run-details-modal" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
@@ -649,12 +640,12 @@
 {% block scripts %}
 <script>
     // Tag management functions
-    let blacklistTags = {{ config.tag_blacklist|tojson }};
-    let ignoreTags = {{ config.tag_similarity_ignore_list|tojson }};
+    let blacklistTags = {{ config.REC_TAG_BLACKLIST|tojson }};
+    let ignoreTags = {{ config.LIB_TAG_IGNORE_LIST|tojson }};
 
     // Artist management functions
-    let blacklistArtists = {{ config.artist_blacklist|tojson }};
-    let excludeArtists = {{ config.exclude_from_taste_profile|tojson }};
+    let blacklistArtists = {{ config.REC_ARTISTS_BLACKLIST|tojson }};
+    let excludeArtists = {{ config.LIB_ARTISTS_IGNORE|tojson }};
 
     function addTag(listType, tag) {
         const list = listType === 'blacklist' ? blacklistTags : ignoreTags;
@@ -697,9 +688,9 @@
         const colorClass = listType === 'blacklist' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200';
 
         container.innerHTML = list.map(tag => `
-            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${colorClass} border">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass} border">
                 ${tag}
-                <button type="button" onclick="removeTag('${listType}', '${tag}')" class="ml-1.5 hover:opacity-70">
+                <button type="button" onclick="removeTag('${listType}', '${tag}')" class="ml-1 hover:opacity-70">
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
@@ -750,9 +741,9 @@
         const colorClass = listType === 'blacklist' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
 
         container.innerHTML = list.map(artist => `
-            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${colorClass} border">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass} border">
                 ${artist}
-                <button type="button" onclick="removeArtist('${listType}', '${artist}')" class="ml-1.5 hover:opacity-70">
+                <button type="button" onclick="removeArtist('${listType}', '${artist}')" class="ml-1 hover:opacity-70">
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
@@ -773,7 +764,7 @@
         const formData = new FormData();
         formData.append('enable_tag_similarity', document.getElementById('enable-tags').checked);
         formData.append('tag_ignore_list', ignoreTags.join(','));
-        formData.append('tag_blacklist', blacklistTags.join(','));
+        formData.append('REC_TAG_BLACKLIST', blacklistTags.join(','));
 
         fetch('/update-tag-profile', {
             method: 'POST',
@@ -787,7 +778,7 @@
 
     function updateImpactMeter() {
         const formData = new FormData(document.getElementById('config-form'));
-        formData.set('tag_blacklist', blacklistTags.join(','));
+        formData.set('REC_TAG_BLACKLIST', blacklistTags.join(','));
 
         fetch('/update-impact-meter', {
             method: 'POST',
@@ -803,50 +794,45 @@
         updateImpactMeter();
     }
 
-    // Update blacklist top N tags setting
     function updateBlacklistTopN(value) {
         const numValue = parseInt(value);
         const displayValue = numValue === 0 ? 'all' : numValue.toString();
         document.getElementById('blacklist-top-n-value').textContent = displayValue;
-
-        // Store in session (could add server-side persistence here if needed)
         sessionStorage.setItem('tag_blacklist_top_n', value);
     }
 
-    // Update processing status display
     function updateProcessingStatus(status, message) {
         const statusDiv = document.getElementById('processing-status');
         let icon, color;
 
         switch(status) {
             case 'processing':
-                icon = '<svg class="animate-spin w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>';
+                icon = '<svg class="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>';
                 color = 'bg-blue-100 text-blue-600';
                 break;
             case 'success':
-                icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
                 color = 'bg-green-100 text-green-600';
                 break;
             case 'error':
-                icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
                 color = 'bg-red-100 text-red-600';
                 break;
             default:
-                icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>';
+                icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>';
                 color = 'bg-slate-100 text-slate-600';
         }
 
         statusDiv.innerHTML = `
-            <div class="text-center py-6">
-                <div class="w-12 h-12 mx-auto mb-3 rounded-full ${color} flex items-center justify-center">
+            <div class="text-center py-4">
+                <div class="w-10 h-10 mx-auto mb-2 rounded-full ${color} flex items-center justify-center">
                     ${icon}
                 </div>
-                <p class="text-sm font-medium text-slate-900">${message}</p>
+                <p class="text-xs font-medium text-slate-900">${message}</p>
             </div>
         `;
     }
 
-    // Generate recommendations with progress indicators
     function generateRecommendations() {
         const button = document.getElementById('generate-button');
         button.disabled = true;
@@ -854,7 +840,6 @@
 
         updateProcessingStatus('processing', 'Generating recommendations...');
 
-        // Collect all form data including date range
         const formData = new FormData(document.getElementById('config-form'));
 
         fetch('/generate-recommendations', {
@@ -882,7 +867,6 @@
                 }
                 updateProcessingStatus('success', message);
 
-                // Refresh preview
                 fetch('/preview-recommendations', {
                     method: 'POST',
                     body: new FormData(document.getElementById('config-form'))
@@ -892,10 +876,7 @@
                     document.getElementById('preview-container').innerHTML = html;
                 });
 
-                // Refresh run history
                 refreshRunHistory();
-
-                // Clear cached results so they reload on tab switch
                 cachedMarkdown = '';
             } else {
                 updateProcessingStatus('error', `Error: ${data.error}`);
@@ -908,7 +889,6 @@
         });
     }
 
-    // Clear cache
     function clearCache() {
         if (!confirm('Clear all caches? This will force re-fetch of Last.fm data and regenerate recommendations.')) {
             return;
@@ -932,7 +912,6 @@
         .catch(error => alert(`Error: ${error.message}`));
     }
 
-    // Scan library
     function scanLibrary() {
         if (!confirm('Force re-scan library? This may take a few minutes.')) {
             return;
@@ -952,7 +931,7 @@
 
             if (data.success) {
                 alert(`Library scanned: ${data.artist_count} artists found`);
-                location.reload();  // Reload to show updated stats
+                location.reload();
             } else {
                 alert(`Error: ${data.error}`);
             }
@@ -964,7 +943,6 @@
         });
     }
 
-    // Load results markdown
     let cachedMarkdown = '';
 
     function loadResults() {
@@ -997,30 +975,19 @@
             });
     }
 
-    // Simple markdown to HTML converter
     function convertMarkdownToHTML(markdown) {
         let html = markdown;
-
-        // Headers
         html = html.replace(/### (.*?)(\n|$)/g, '<h3 class="text-lg font-semibold text-slate-900 mt-4 mb-2">$1</h3>');
         html = html.replace(/## (.*?)(\n|$)/g, '<h2 class="text-xl font-bold text-slate-900 mt-6 mb-3">$1</h2>');
         html = html.replace(/# (.*?)(\n|$)/g, '<h1 class="text-2xl font-bold text-slate-900 mb-4">$1</h1>');
-
-        // Bold
         html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
-
-        // Lists
         html = html.replace(/^- (.*?)$/gm, '<li class="ml-4">$1</li>');
         html = html.replace(/(<li.*<\/li>)/s, '<ul class="list-disc space-y-1 mb-4">$1</ul>');
-
-        // Line breaks
         html = html.replace(/\n\n/g, '</p><p class="mb-2">');
         html = '<p class="mb-2">' + html + '</p>';
-
         return html;
     }
 
-    // Export markdown to file
     function exportMarkdown() {
         if (!cachedMarkdown) {
             alert('No results to export. Load results first.');
@@ -1038,7 +1005,6 @@
         URL.revokeObjectURL(url);
     }
 
-    // Copy to clipboard
     function copyToClipboard() {
         if (!cachedMarkdown) {
             alert('No results to copy. Load results first.');
@@ -1050,7 +1016,6 @@
             .catch(err => alert('Failed to copy: ' + err));
     }
 
-    // Load visualisation
     function loadVisualisation() {
         const placeholder = document.getElementById('visualisation-placeholder');
         const content = document.getElementById('visualisation-content');
@@ -1072,7 +1037,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
                             <p class="text-lg font-medium">${data.error}</p>
-                            <p class="text-sm mt-2">Enable GENERATE_HTML_VISUALISATION in .env and regenerate recommendations</p>
+                            <p class="text-sm mt-2">Enable HTML_VISUALISATION in .env and regenerate recommendations</p>
                         </div>`;
                 }
             })
@@ -1081,7 +1046,6 @@
             });
     }
 
-    // Export settings
     function exportSettings() {
         fetch('/export-settings', { method: 'POST' })
             .then(response => response.json())
@@ -1098,7 +1062,6 @@
             });
     }
 
-    // Import settings
     function importSettings() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -1133,7 +1096,6 @@
         input.click();
     }
 
-    // Reset to defaults
     function resetToDefaults() {
         if (!confirm('Reset all settings to defaults from .env? Current session settings will be cleared.')) {
             return;
@@ -1153,7 +1115,6 @@
             });
     }
 
-    // Load settings from run history
     function loadRunSettings(runId) {
         if (!confirm('Load settings from this run? Current settings will be replaced.')) {
             return;
@@ -1173,7 +1134,6 @@
         });
     }
 
-    // Refresh run history list
     function refreshRunHistory() {
         fetch('/get-run-history')
             .then(response => response.json())
@@ -1183,7 +1143,7 @@
                     container.innerHTML = data.runs.slice(0, 5).map(run => `
                         <button
                             onclick="loadRunSettings(${run.id})"
-                            class="w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                            class="w-full text-left px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
                             title="Click to load these settings">
                             <div class="flex items-center justify-between">
                                 <div class="text-xs font-medium text-slate-900">
@@ -1200,7 +1160,6 @@
             });
     }
 
-    // Save tags to .env file
     function saveTagsToEnv(listType) {
         if (!confirm('Save current tag lists to .env file? This will permanently update your .env configuration.')) {
             return;
@@ -1209,7 +1168,7 @@
         const topNValue = document.getElementById('blacklist-top-n-slider').value;
 
         const data = {
-            tag_blacklist: blacklistTags,
+            REC_TAG_BLACKLIST: blacklistTags,
             tag_ignore_list: ignoreTags,
             tag_blacklist_top_n: topNValue
         };
@@ -1230,11 +1189,9 @@
         });
     }
 
-    // Initial load
     document.addEventListener('DOMContentLoaded', () => {
         updateImpactMeter();
 
-        // Load initial preview
         const formData = new FormData(document.getElementById('config-form'));
         fetch('/preview-recommendations', {
             method: 'POST',
@@ -1245,13 +1202,11 @@
             document.getElementById('preview-container').innerHTML = html;
         });
 
-        // Add tab switching handlers to load content on demand
         const tabs = document.querySelectorAll('[data-tab]');
         tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
                 const tabName = e.target.getAttribute('data-tab');
 
-                // Load content when switching to Results or Visualisation tab
                 if (tabName === 'results') {
                     loadResults();
                 } else if (tabName === 'visualisation') {

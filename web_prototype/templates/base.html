@@ -95,6 +95,39 @@
             opacity: 0;
             transition: opacity 200ms ease-out;
         }
+
+        /* Algorithm stage colour coding */
+        .stage-input { border-left: 4px solid #3B82F6; }      /* Blue */
+        .stage-taste { border-left: 4px solid #10B981; }      /* Green */
+        .stage-filter { border-left: 4px solid #F59E0B; }     /* Orange */
+        .stage-scoring { border-left: 4px solid #8B5CF6; }    /* Purple */
+
+        .stage-header {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .stage-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 9999px;
+            font-size: 0.625rem;
+            font-weight: 700;
+        }
+
+        .stage-input .stage-number { background-color: #3B82F6; color: white; }
+        .stage-taste .stage-number { background-color: #10B981; color: white; }
+        .stage-filter .stage-number { background-color: #F59E0B; color: white; }
+        .stage-scoring .stage-number { background-color: #8B5CF6; color: white; }
     </style>
 </head>
 <body class="h-full">
@@ -187,7 +220,7 @@
                 loved_play_count_threshold: parseInt(document.querySelector('[name="loved_play_count"]').value),
                 enable_tag_similarity: document.querySelector('[name="enable_tag_similarity"]').checked,
                 enable_play_frequency_weighting: document.querySelector('[name="enable_play_frequency_weighting"]').checked,
-                tag_blacklist: document.getElementById('tag-blacklist-input').value.split(',').filter(t => t.trim()),
+                REC_TAG_BLACKLIST: document.getElementById('tag-blacklist-input').value.split(',').filter(t => t.trim()),
                 tag_ignore_list: document.getElementById('tag-ignore-input').value.split(',').filter(t => t.trim()),
                 date_from: document.querySelector('[name="date_from"]').value,
                 date_to: document.querySelector('[name="date_to"]').value,
@@ -237,8 +270,8 @@
                     if (typeof settings.enable_play_frequency_weighting !== 'undefined') {
                         document.querySelector('[name="enable_play_frequency_weighting"]').checked = settings.enable_play_frequency_weighting;
                     }
-                    if (settings.tag_blacklist) {
-                        window.blacklistTags = settings.tag_blacklist;
+                    if (settings.REC_TAG_BLACKLIST) {
+                        window.blacklistTags = settings.REC_TAG_BLACKLIST;
                         window.updateTagDisplay('blacklist');
                         window.updateTagInput('blacklist');
                     }

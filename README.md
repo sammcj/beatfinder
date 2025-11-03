@@ -290,7 +290,7 @@ python beatfinder.py --clear-rejected
 
 To disable interactive filtering permanently, set in `.env`:
 ```
-ENABLE_INTERACTIVE_FILTERING=false
+CLI_INTERACTIVE_FILTERING=false
 ```
 
 ## Output
@@ -358,7 +358,7 @@ Examples:
 
 ### Cache Settings
 - `CACHE_EXPIRY_DAYS` - How long to keep cached Last.fm metadata (default: 7 days)
-- `RECOMMENDATIONS_CACHE_EXPIRY_DAYS` - How long to keep cached recommendations (default: 7 days)
+- `REC_CACHE_EXPIRY_DAYS` - How long to keep cached recommendations (default: 7 days)
 
 When you run the script, it caches the generated recommendations. Subsequent runs will use the cached recommendations if they're still valid (not expired and matching the current rarity preference). This means you can quickly regenerate the HTML visualisation or markdown output without re-processing everything.
 
@@ -373,9 +373,9 @@ When you run the script, it caches the generated recommendations. Subsequent run
 - `TAG_IGNORE_LIST` - Comma-separated list of tags to exclude from similarity scoring (e.g., `pop,christmas,instrumental`). These tags won't influence recommendations but won't blacklist artists that have them (default: empty)
 
 ### Apple Music Playlist Creation
-- `CREATE_APPLE_MUSIC_PLAYLIST` - Automatically create a playlist with top songs from recommended artists (default: false)
+- `CREATE_PLAYLIST` - Automatically create a playlist with top songs from recommended artists (default: false)
 - `PLAYLIST_SONGS_PER_ARTIST` - Number of songs to add per artist (default: 3)
-- `APPLE_MUSIC_SCRAPE_BATCH_SIZE` - Number of concurrent browsers for scraping (default: 5)
+- `AM_SCRAPE_BATCH_SIZE` - Number of concurrent browsers for scraping (default: 5)
 
 **How it works:**
 1. Scrapes Apple Music catalogue to find top songs for each recommended artist
@@ -404,7 +404,7 @@ The playlist feature uses Apple Music's web API via browser-extracted tokens (no
 - When expired, re-extract from browser using steps above
 
 ### HTML Visualisation
-- `GENERATE_HTML_VISUALISATION` - Generate an interactive HTML visualisation showing recommendation connections (default: false)
+- `HTML_VISUALISATION` - Generate an interactive HTML visualisation showing recommendation connections (default: false)
 
 When enabled, creates `recommendations_visualisation.html` with an interactive network graph showing:
 - Your loved artists (blue nodes) connected to recommended artists (green nodes)
