@@ -48,6 +48,9 @@ from recommendation_engine import (
     load_recommendations_cache,
     save_recommendations_cache,
 )
+from apple_music_integration import create_apple_music_playlist_with_scraping
+from apple_music_web_api import create_beatfinder_playlist
+from config import PLAYLIST_SONGS_PER_ARTIST, PLAYLIST_MERGE_MODE, AM_SCRAPE_BATCH_SIZE
 from interactive_filter import (
     filter_rejected_from_recommendations,
     REJECTED_ARTISTS_FILE,
@@ -517,12 +520,56 @@ def generate_recommendations_stream():
                 # Save to run history
                 save_run_history(config, len(recommendations))
 
+                # Create Apple Music playlist if enabled
+                playlist_created = False
+                playlist_message = None
+                if config.get('CREATE_PLAYLIST', False):
+                    try:
+                        progress_callback("phase", "Creating Apple Music playlist...", 0, 0)
+
+                        # Use top recommendations for playlist (limited by MAX_RECOMMENDATIONS)
+                        playlist_recs = recommendations[:config['max_recommendations']]
+
+                        # Scrape Apple Music for song URLs
+                        result = create_apple_music_playlist_with_scraping(
+                            playlist_recs,
+                            limit=len(playlist_recs),
+                            songs_per_artist=PLAYLIST_SONGS_PER_ARTIST,
+                            batch_size=AM_SCRAPE_BATCH_SIZE
+                        )
+                        artist_music_data = result.get('artist_data', {})
+
+                        # Validate scraped data to ensure no known artists slipped through
+                        validated_data = {}
+                        if artist_music_data:
+                            for artist, songs in artist_music_data.items():
+                                # Only include if we have valid song data
+                                if songs and len(songs) > 0:
+                                    validated_data[artist] = songs
+
+                        if validated_data:
+                            # Create actual Apple Music playlist using web API
+                            playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE)
+                            if playlist_id:
+                                playlist_created = True
+                                playlist_message = f"Created Apple Music playlist with {len(validated_data)} songs"
+                                progress_callback("phase", playlist_message, 0, 0)
+                            else:
+                                playlist_message = "Could not create Apple Music playlist (tokens may need refreshing)"
+                        else:
+                            playlist_message = "Could not find songs on Apple Music"
+                    except Exception as e:
+                        playlist_message = f"Playlist creation failed: {str(e)}"
+                        print(f"Playlist creation error: {e}")
+
                 result_holder['success'] = True
                 result_holder['data'] = {
                     'count': len(recommendations),
                     'preview': recommendations[:5],
                     'filtered_artists': len(artist_stats) if time_filter else None,
-                    'time_filter': time_filter
+                    'time_filter': time_filter,
+                    'playlist_created': playlist_created,
+                    'playlist_message': playlist_message
                 }
 
             except Exception as e:

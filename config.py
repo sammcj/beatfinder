@@ -21,6 +21,13 @@ APPLE_EXPORT_DIR = os.getenv("APPLE_EXPORT_DIR", "")
 # Recommendation settings
 MAX_RECOMMENDATIONS = int(os.getenv("MAX_RECOMMENDATIONS", "15"))
 
+# Similar artists limit: how many similar artists to fetch per loved artist
+SIMILAR_ARTISTS_LIMIT = int(os.getenv("SIMILAR_ARTISTS_LIMIT", "15"))
+
+# Smart tag fetching: only fetch tags for top N candidates (0 = fetch for all)
+# Recommended: 500-1000 for balance between speed and tag-based filtering
+TAG_FETCH_LIMIT = int(os.getenv("TAG_FETCH_LIMIT", "1000"))
+
 # Artist classification thresholds
 KNOWN_ARTIST_MIN_PLAY_COUNT = int(os.getenv("KNOWN_ARTIST_MIN_PLAY_COUNT", "3"))
 KNOWN_ARTIST_MIN_TRACKS = int(os.getenv("KNOWN_ARTIST_MIN_TRACKS", "5"))

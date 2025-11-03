@@ -894,6 +894,12 @@
                         };
                         message += ` (${data.data.filtered_artists} artists from ${filterLabels[data.data.time_filter] || 'time filter'})`;
                     }
+
+                    // Add playlist creation status
+                    if (data.data.playlist_message) {
+                        message += `<br><span class="${data.data.playlist_created ? 'text-green-600' : 'text-amber-600'}">${data.data.playlist_message}</span>`;
+                    }
+
                     updateProcessingStatus('success', message);
 
                     // Refresh preview

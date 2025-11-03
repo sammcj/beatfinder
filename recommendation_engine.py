@@ -36,6 +36,8 @@ from config import (
     REC_TAG_BLACKLIST,
     REC_TAG_BLACKLIST_TOP_N_TAGS,
     LIB_TAG_IGNORE_LIST,
+    SIMILAR_ARTISTS_LIMIT,
+    TAG_FETCH_LIMIT,
 )
 
 
@@ -409,7 +411,7 @@ class RecommendationEngine:
         })
 
         def fetch_similar(artist: str) -> tuple:
-            similar = self.lastfm.get_similar_artists(artist)
+            similar = self.lastfm.get_similar_artists(artist, limit=SIMILAR_ARTISTS_LIMIT)
             return artist, similar
 
         # Phase 1: Fetch similar artists (parallelised)
@@ -465,17 +467,38 @@ class RecommendationEngine:
                     failed += 1
                     continue
 
-        # Phase 2: Fetch tags for all recommended artists (parallelised)
-        print(f"\nFetching tags for {len(recommendations)} potential recommendations...")
+        print(f"\nFound {len(recommendations)} potential recommendations")
 
-        # Warn if recommendations count is excessive
-        if len(recommendations) > 5000:
-            warning = f"⚠️  Warning: {len(recommendations)} recommendations is excessive (typical: 500-2000)"
-            print(warning)
-            print("   Consider increasing KNOWN_ARTIST_MIN_PLAY_COUNT or KNOWN_ARTIST_MIN_TRACKS")
+        # SMART TAG FETCHING: Pre-score WITHOUT tags to identify top candidates BEFORE fetching tags
+        # This dramatically reduces API calls (e.g., 15,979 → 1,000)
+        if TAG_FETCH_LIMIT > 0 and len(recommendations) > TAG_FETCH_LIMIT:
+            print(f"\nPre-scoring to identify top {TAG_FETCH_LIMIT} candidates (deferred tag fetching)...")
             if self.progress_callback:
-                self.progress_callback("phase", f"{warning} - this will take ~{len(recommendations) / 5 / 60:.0f} minutes", len(recommendations))
+                self.progress_callback("phase", f"Pre-scoring {len(recommendations)} candidates", len(recommendations))
 
+            # Quick scoring without tags (frequency + match + rarity only)
+            pre_scored = []
+            for name, data in recommendations.items():
+                frequency_score = len(data["recommended_by"]) / len(loved_artists)
+                avg_match = sum(data["match_scores"]) / len(data["match_scores"])
+                listeners = data["listeners"] or 1
+                rarity_score = 1 / (1 + listeners / 1000000)
+
+                # Simple scoring without tag similarity
+                score = (frequency_score * 0.4) + (avg_match * 0.3) + (rarity_score * 0.3)
+
+                pre_scored.append((name, score, data))
+
+            # Sort and keep only top TAG_FETCH_LIMIT candidates
+            pre_scored.sort(key=lambda x: x[1], reverse=True)
+            top_candidates = {name: data for name, score, data in pre_scored[:TAG_FETCH_LIMIT]}
+
+            reduction_pct = (1 - len(top_candidates)/len(recommendations))*100
+            print(f"Reduced from {len(recommendations)} to {len(top_candidates)} candidates ({reduction_pct:.1f}% reduction)")
+            recommendations = top_candidates
+
+        # Phase 2: Fetch tags for top recommended artists (parallelised)
+        print(f"\nFetching tags for {len(recommendations)} artists...")
         if self.progress_callback:
             self.progress_callback("phase", f"Fetching tags for {len(recommendations)} artists", len(recommendations))
 
@@ -495,7 +518,7 @@ class RecommendationEngine:
                     recommendations[artist_name]["tags"] = list(tags)
                     completed += 1
 
-                    # More frequent progress updates for large sets (every 50 instead of 100)
+                    # Progress updates every 50, but save cache less frequently (every 100)
                     if completed % 50 == 0 or completed == len(recommendations):
                         status = f"Fetching tags: {completed}/{len(recommendations)}"
                         if failed_tags > 0:
@@ -503,15 +526,17 @@ class RecommendationEngine:
                         print(f"  {status}...")
                         if self.progress_callback:
                             self.progress_callback("progress", status, completed, len(recommendations))
-                        # Save cache periodically
+
+                    # Save cache every 100 artists to balance performance vs resume capability
+                    if completed % 100 == 0 or completed == len(recommendations):
                         self.lastfm.save_cache()
                 except Exception as e:
                     failed_tags += 1
                     continue
 
-        print(f"\nFound {len(recommendations)} potential recommendations")
+        # Apply tag blacklist filtering and final scoring
         if self.progress_callback:
-            self.progress_callback("phase", f"Scoring {len(recommendations)} potential recommendations", len(recommendations))
+            self.progress_callback("phase", f"Scoring {len(recommendations)} recommendations", len(recommendations))
 
         # Filter out artists with blacklisted tags
         if REC_TAG_BLACKLIST:
@@ -586,28 +611,61 @@ class RecommendationEngine:
 
         scored_recommendations.sort(key=lambda x: x["score"], reverse=True)
 
-        print(f"Fetching detailed info for top {min(100, len(scored_recommendations))} recommendations...")
-        for rec in scored_recommendations[:100]:
-            artist_info = self.lastfm.get_artist_info(rec["name"])
-            if artist_info and artist_info.get("listeners", 0) > 0:
-                rec["listeners"] = artist_info["listeners"]
-                rec["rarity_score"] = 1 / (1 + rec["listeners"] / 1000000)
+        # Fetch detailed info for top 100 recommendations (parallelised)
+        top_recs = scored_recommendations[:100]
+        print(f"Fetching detailed info for top {len(top_recs)} recommendations...")
+        if self.progress_callback:
+            self.progress_callback("phase", f"Fetching detailed info for top {len(top_recs)} recommendations", len(top_recs))
 
-                if ENABLE_TAG_SIMILARITY or ENABLE_PLAY_FREQUENCY_WEIGHTING:
-                    freq_score = rec["frequency"]
-                    rec["score"] = (
-                        (freq_score * SCORING_FREQUENCY_WEIGHT) +
-                        (rec["tag_similarity"] * SCORING_TAG_OVERLAP_WEIGHT) +
-                        (rec["avg_match"] * SCORING_MATCH_WEIGHT) +
-                        (rec["rarity_score"] * SCORING_RARITY_WEIGHT)
-                    )
-                else:
-                    pref = rec["rarity_pref"]
-                    # Extended rarity scale: 1-15
-                    rarity_weight = 0.1 + (pref - 1) * 0.4 / 14
-                    frequency_weight = 0.5 - (pref - 1) * 0.15 / 14
-                    match_weight = 1.0 - rarity_weight - frequency_weight
-                    rec["score"] = (rec["frequency"] * frequency_weight) + (rec["avg_match"] * match_weight) + (rec["rarity_score"] * rarity_weight)
+        def fetch_artist_info(rec: Dict) -> tuple:
+            artist_info = self.lastfm.get_artist_info(rec["name"])
+            return rec["name"], artist_info
+
+        # Parallel fetch with progress updates
+        with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
+            info_futures = {executor.submit(fetch_artist_info, rec): rec for rec in top_recs}
+
+            completed = 0
+            for future in as_completed(info_futures):
+                try:
+                    artist_name, artist_info = future.result()
+                    rec = info_futures[future]
+
+                    if artist_info and artist_info.get("listeners", 0) > 0:
+                        rec["listeners"] = artist_info["listeners"]
+                        rec["rarity_score"] = 1 / (1 + rec["listeners"] / 1000000)
+
+                        if ENABLE_TAG_SIMILARITY or ENABLE_PLAY_FREQUENCY_WEIGHTING:
+                            freq_score = rec["frequency"]
+                            rec["score"] = (
+                                (freq_score * SCORING_FREQUENCY_WEIGHT) +
+                                (rec["tag_similarity"] * SCORING_TAG_OVERLAP_WEIGHT) +
+                                (rec["avg_match"] * SCORING_MATCH_WEIGHT) +
+                                (rec["rarity_score"] * SCORING_RARITY_WEIGHT)
+                            )
+                        else:
+                            pref = rec["rarity_pref"]
+                            # Extended rarity scale: 1-15
+                            rarity_weight = 0.1 + (pref - 1) * 0.4 / 14
+                            frequency_weight = 0.5 - (pref - 1) * 0.15 / 14
+                            match_weight = 1.0 - rarity_weight - frequency_weight
+                            rec["score"] = (rec["frequency"] * frequency_weight) + (rec["avg_match"] * match_weight) + (rec["rarity_score"] * rarity_weight)
+
+                    completed += 1
+
+                    # Progress updates every 25 artists
+                    if completed % 25 == 0 or completed == len(top_recs):
+                        status = f"Fetching artist info: {completed}/{len(top_recs)}"
+                        print(f"  {status}...")
+                        if self.progress_callback:
+                            self.progress_callback("progress", status, completed, len(top_recs))
+
+                    # Save cache every 50 artists
+                    if completed % 50 == 0 or completed == len(top_recs):
+                        self.lastfm.save_cache()
+
+                except Exception as e:
+                    continue
 
         scored_recommendations.sort(key=lambda x: x["score"], reverse=True)
 
