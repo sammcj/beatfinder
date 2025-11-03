@@ -56,13 +56,15 @@
                     </div>
                 </div>
                 <div class="flex gap-1 ml-3">
-                    <button class="px-2 py-1 text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 rounded border border-slate-200"
+                    <button onclick="parent.addArtist('blacklist', '{{ rec.name }}'); alert('{{ rec.name }} added to blacklist');"
+                            class="px-2 py-1 text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 rounded border border-slate-200"
                             title="Add artist to blacklist">
-                        Block Artist
+                        Blacklist Artist
                     </button>
-                    <button class="px-2 py-1 text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 rounded border border-slate-200"
+                    <button onclick="{% for tag in rec.tags %}parent.addTag('blacklist', '{{ tag }}');{% endfor %} alert('Tags added to blacklist');"
+                            class="px-2 py-1 text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 rounded border border-slate-200"
                             title="Add tags to blacklist">
-                        Block Tags
+                        Blacklist Tags
                     </button>
                 </div>
             </div>

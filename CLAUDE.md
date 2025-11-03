@@ -218,7 +218,8 @@ All settings in `.env` (copy from `.env.example`):
 - `ENABLE_PLAY_FREQUENCY_WEIGHTING`: Weight by play counts
 - `LAST_MONTHS_FILTER`: Time-based filtering in months, 0=disabled
 - `TAG_SIMILARITY_IGNORE_LIST`: Comma-separated tags excluded from similarity scoring (artists with these tags can still be recommended)
-- `TAG_BLACKLIST`: Comma-separated tags that completely filter out artists (artists with any blacklisted tag will never be recommended)
+- `TAG_BLACKLIST`: Comma-separated tags that completely filter out artists
+- `TAG_BLACKLIST_TOP_N_TAGS`: Check only top N tags for blacklist (0/"all"=check all tags, 1-20=check top N only). Lower values allow artists with minor blacklisted tags.
 - `CREATE_APPLE_MUSIC_PLAYLIST`: Auto-create playlist
 - `GENERATE_HTML_VISUALISATION`: Generate interactive graph
 
@@ -329,9 +330,21 @@ All settings in `.env` (copy from `.env.example`):
 - Example: Artist tagged "indie pop, dreamy" with "pop" in blacklist → completely filtered out, never recommended
 - Filtering happens in `generate_recommendations()` at line 450-465
 
+**TAG_BLACKLIST_TOP_N_TAGS** (selective blacklist filtering):
+- Controls how many tags to check when applying TAG_BLACKLIST
+- 0 or "all" (default): Check all tags (most restrictive, current behaviour)
+- 1: Only filter if blacklisted tag is the artist's #1 tag
+- 3-10: Only filter if blacklisted tag is in top N tags
+- Use case: Allow artists with minor/low-weight blacklisted tags whilst still filtering primary matches
+- Example: Artist tagged "electronic(100), ambient(54), experimental(34), pop(2)" with TAG_BLACKLIST="pop" and TAG_BLACKLIST_TOP_N_TAGS=3 → artist is NOT filtered (pop is 4th tag, outside top 3)
+- Tags are already sorted by Last.fm weight (100 = most popular tag for that artist)
+- Lower N values = more permissive (allow artists with minor blacklisted tags)
+- Higher N values = more restrictive (approach "all tags" behaviour)
+
 **When to use each:**
 - Ignore list: Tags that are too generic or don't define your taste (e.g., "indie", "rock", "electronic" if you like many subgenres)
-- Blacklist: Genres you actively dislike and never want recommended (e.g., "pop", "country", "edm")
+- Blacklist (with top N = all): Genres you absolutely never want, even as minor tags (e.g., "christmas", "country")
+- Blacklist (with top N = 1-10): Genres you don't want as primary focus, but tolerate as minor influences (e.g., "pop" at top 3 filters pop artists but allows electronic artists with minor pop influence)
 
 ## Virtual Environment
 

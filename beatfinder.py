@@ -83,7 +83,7 @@ def format_recommendations(recommendations: List[Dict], limit: int, artist_music
             output.append(f"- ...and {len(rec['recommended_by']) - 5} more\n")
 
         if rec['tags']:
-            output.append(f"\n**Tags:** {', '.join(rec['tags'][:8])}\n")
+            output.append(f"\n**Tags:** {', '.join(rec['tags'][:5])}\n")
 
         # Apple Music links from scraping data
         artist_name = rec['name']
@@ -711,6 +711,48 @@ def get_library_parser():
         return AppleMusicLibrary()
 
 
+def save_run_to_history(limit: int, rarity: int, recommendations_count: int):
+    """Save run to history file for web UI"""
+    try:
+        run_history_file = Path("data/run_history.json")
+        run_history_file.parent.mkdir(exist_ok=True)
+
+        # Load existing history
+        if run_history_file.exists():
+            with open(run_history_file, 'r') as f:
+                history = json.load(f)
+        else:
+            history = []
+
+        # Add new run
+        run = {
+            'id': len(history) + 1,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'recommendations_count': recommendations_count,
+            'settings': {
+                'rarity': rarity,
+                'max_recommendations': limit,
+                'enable_tag_similarity': False,  # CLI doesn't expose these
+                'enable_play_frequency_weighting': False,
+                'time_filter': '',
+            },
+            'source': 'CLI'  # Mark as CLI run
+        }
+
+        history.insert(0, run)  # Add to beginning (most recent first)
+
+        # Keep only last 50 runs
+        history = history[:50]
+
+        # Save
+        with open(run_history_file, 'w') as f:
+            json.dump(history, f, indent=2)
+
+    except Exception as e:
+        # Don't fail the whole run if history saving fails
+        print(f"Warning: Could not save run history: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Discover new artists based on your Apple Music library")
     parser.add_argument("--scan-library", action="store_true", help="Force re-scan of Music library (slow)")
@@ -880,6 +922,9 @@ def main():
     # Generate HTML visualisation if enabled
     loved_artists = engine.get_loved_artists()
     generate_html_visualisation(recommendations, loved_artists, args.limit, artist_music_data, library_stats)
+
+    # Save run to history file (for web UI)
+    save_run_to_history(args.limit, args.rarity, len(recommendations))
 
 
 if __name__ == "__main__":

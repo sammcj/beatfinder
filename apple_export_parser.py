@@ -71,7 +71,7 @@ class AppleMusicExportParser:
             sys.exit(1)
 
     def _load_cached_stats(self) -> Optional[Dict]:
-        """Load cached artist statistics if valid"""
+        """Load cached artist statistics and library stats if valid"""
         if self.stats_cache_file.exists():
             try:
                 with open(self.stats_cache_file, 'r') as f:
@@ -83,13 +83,26 @@ class AppleMusicExportParser:
                         for artist_data in artists.values():
                             if artist_data.get("last_played"):
                                 artist_data["last_played"] = datetime.fromisoformat(artist_data["last_played"])
+
+                        # Load library stats from cache
+                        if "library_stats" in cache:
+                            lib_stats = cache["library_stats"]
+
+                            # Validate that cache has required fields (invalidate old cache)
+                            required_fields = ["oldest_play", "history_span_days", "total_plays"]
+                            if all(field in lib_stats for field in required_fields):
+                                self.library_stats = lib_stats
+                            else:
+                                print("Cache missing library statistics fields - will re-scan")
+                                return None
+
                         return artists
             except Exception as e:
                 print(f"Warning: Failed to load cache: {e}")
         return None
 
     def _save_cached_stats(self, stats: Dict):
-        """Save artist statistics to cache"""
+        """Save artist statistics and library stats to cache"""
         # Convert datetime objects to ISO strings for JSON serialisation
         serialisable_stats = {}
         for artist, data in stats.items():
@@ -99,7 +112,8 @@ class AppleMusicExportParser:
 
         cache = {
             "timestamp": datetime.now().isoformat(),
-            "artists": serialisable_stats
+            "artists": serialisable_stats,
+            "library_stats": self.library_stats
         }
         with open(self.stats_cache_file, 'w') as f:
             json.dump(cache, f, indent=2)

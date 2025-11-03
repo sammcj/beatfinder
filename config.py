@@ -60,6 +60,19 @@ TAG_SIMILARITY_IGNORE_LIST = set(tag.strip().lower() for tag in TAG_SIMILARITY_I
 TAG_BLACKLIST_RAW = os.getenv("TAG_BLACKLIST", "")
 TAG_BLACKLIST = set(tag.strip().lower() for tag in TAG_BLACKLIST_RAW.split(",") if tag.strip())
 
+# Tag blacklist top N tags - only check top N tags when filtering (0 or "all" = check all tags)
+TAG_BLACKLIST_TOP_N_TAGS_RAW = os.getenv("TAG_BLACKLIST_TOP_N_TAGS", "all").strip().lower()
+if TAG_BLACKLIST_TOP_N_TAGS_RAW in ["all", "0", ""]:
+    TAG_BLACKLIST_TOP_N_TAGS = 0  # 0 means check all tags
+else:
+    try:
+        TAG_BLACKLIST_TOP_N_TAGS = int(TAG_BLACKLIST_TOP_N_TAGS_RAW)
+        if TAG_BLACKLIST_TOP_N_TAGS < 0:
+            TAG_BLACKLIST_TOP_N_TAGS = 0
+    except ValueError:
+        print(f"Warning: Invalid TAG_BLACKLIST_TOP_N_TAGS value '{TAG_BLACKLIST_TOP_N_TAGS_RAW}', using 'all'")
+        TAG_BLACKLIST_TOP_N_TAGS = 0
+
 # Apple Music playlist creation
 CREATE_APPLE_MUSIC_PLAYLIST = os.getenv("CREATE_APPLE_MUSIC_PLAYLIST", "false").lower() == "true"
 PLAYLIST_SONGS_PER_ARTIST = int(os.getenv("PLAYLIST_SONGS_PER_ARTIST", "3"))
@@ -125,7 +138,8 @@ def show_config():
 
     # Show tag filters if any
     if TAG_BLACKLIST:
-        print(f"\nBlacklisted tags (artists filtered): {', '.join(sorted(TAG_BLACKLIST))}")
+        top_n_desc = f" (top {TAG_BLACKLIST_TOP_N_TAGS} tags only)" if TAG_BLACKLIST_TOP_N_TAGS > 0 else " (all tags)"
+        print(f"\nBlacklisted tags{top_n_desc}: {', '.join(sorted(TAG_BLACKLIST))}")
     if TAG_SIMILARITY_IGNORE_LIST:
         print(f"Similarity ignored tags (not used for scoring): {', '.join(sorted(TAG_SIMILARITY_IGNORE_LIST))}")
 

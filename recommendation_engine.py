@@ -34,6 +34,7 @@ from config import (
     SCORING_RARITY_WEIGHT,
     SCORING_TAG_OVERLAP_WEIGHT,
     TAG_BLACKLIST,
+    TAG_BLACKLIST_TOP_N_TAGS,
     TAG_SIMILARITY_IGNORE_LIST,
 )
 
@@ -452,7 +453,12 @@ class RecommendationEngine:
             filtered_recommendations = {}
             filtered_count = 0
             for name, data in recommendations.items():
-                artist_tags_lower = {tag.lower() for tag in data["tags"]}
+                # Get tags to check (all tags or top N only)
+                tags_to_check = data["tags"]
+                if TAG_BLACKLIST_TOP_N_TAGS > 0:
+                    tags_to_check = tags_to_check[:TAG_BLACKLIST_TOP_N_TAGS]
+
+                artist_tags_lower = {tag.lower() for tag in tags_to_check}
                 # Check if any artist tag matches blacklist
                 if TAG_BLACKLIST & artist_tags_lower:
                     filtered_count += 1
@@ -460,7 +466,8 @@ class RecommendationEngine:
                 filtered_recommendations[name] = data
 
             if filtered_count > 0:
-                print(f"Filtered {filtered_count} artist(s) with blacklisted tags: {', '.join(sorted(TAG_BLACKLIST))}")
+                top_n_desc = f" in top {TAG_BLACKLIST_TOP_N_TAGS} tags" if TAG_BLACKLIST_TOP_N_TAGS > 0 else ""
+                print(f"Filtered {filtered_count} artist(s) with blacklisted tags{top_n_desc}: {', '.join(sorted(TAG_BLACKLIST))}")
 
             recommendations = filtered_recommendations
 
