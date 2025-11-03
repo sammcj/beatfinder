@@ -1241,19 +1241,6 @@
         .then(html => {
             document.getElementById('preview-container').innerHTML = html;
         });
-
-        const tabs = document.querySelectorAll('[data-tab]');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                const tabName = e.target.getAttribute('data-tab');
-
-                if (tabName === 'results') {
-                    loadResults();
-                } else if (tabName === 'visualisation') {
-                    loadVisualisation();
-                }
-            });
-        });
     });
 </script>
 {% endblock %}

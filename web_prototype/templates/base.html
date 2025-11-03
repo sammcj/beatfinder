@@ -208,6 +208,13 @@
 
             document.getElementById('tab-' + tabName).classList.remove('text-slate-600', 'border-transparent');
             document.getElementById('tab-' + tabName).classList.add('text-slate-900', 'border-primary-600');
+
+            // Load data when switching to Results or Visualisation tabs
+            if (tabName === 'results' && typeof loadResults === 'function') {
+                loadResults();
+            } else if (tabName === 'visualisation' && typeof loadVisualisation === 'function') {
+                loadVisualisation();
+            }
         }
 
         // Export/Import Settings

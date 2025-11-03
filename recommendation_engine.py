@@ -404,7 +404,7 @@ class RecommendationEngine:
             "recommended_by": [],
             "recommender_weights": [],
             "listeners": 0,
-            "tags": set(),
+            "tags": [],  # List to preserve Last.fm tag ordering and support slicing
             "match_scores": []
         })
 
@@ -467,6 +467,15 @@ class RecommendationEngine:
 
         # Phase 2: Fetch tags for all recommended artists (parallelised)
         print(f"\nFetching tags for {len(recommendations)} potential recommendations...")
+
+        # Warn if recommendations count is excessive
+        if len(recommendations) > 5000:
+            warning = f"⚠️  Warning: {len(recommendations)} recommendations is excessive (typical: 500-2000)"
+            print(warning)
+            print("   Consider increasing KNOWN_ARTIST_MIN_PLAY_COUNT or KNOWN_ARTIST_MIN_TRACKS")
+            if self.progress_callback:
+                self.progress_callback("phase", f"{warning} - this will take ~{len(recommendations) / 5 / 60:.0f} minutes", len(recommendations))
+
         if self.progress_callback:
             self.progress_callback("phase", f"Fetching tags for {len(recommendations)} artists", len(recommendations))
 
@@ -478,18 +487,26 @@ class RecommendationEngine:
             tag_futures = {executor.submit(fetch_tags, name): name for name in recommendations.keys()}
 
             completed = 0
+            failed_tags = 0
             for future in as_completed(tag_futures):
                 try:
                     artist_name, tags = future.result()
-                    recommendations[artist_name]["tags"] = set(tags)
+                    # Keep tags as list to preserve Last.fm ordering (by weight/popularity)
+                    recommendations[artist_name]["tags"] = list(tags)
                     completed += 1
 
-                    if completed % 100 == 0 or completed == len(recommendations):
+                    # More frequent progress updates for large sets (every 50 instead of 100)
+                    if completed % 50 == 0 or completed == len(recommendations):
+                        status = f"Fetching tags: {completed}/{len(recommendations)}"
+                        if failed_tags > 0:
+                            status += f" ({failed_tags} failed)"
+                        print(f"  {status}...")
                         if self.progress_callback:
-                            self.progress_callback("progress", f"Fetching tags: {completed}/{len(recommendations)}", completed, len(recommendations))
+                            self.progress_callback("progress", status, completed, len(recommendations))
                         # Save cache periodically
                         self.lastfm.save_cache()
-                except Exception:
+                except Exception as e:
+                    failed_tags += 1
                     continue
 
         print(f"\nFound {len(recommendations)} potential recommendations")
@@ -534,7 +551,7 @@ class RecommendationEngine:
 
             tag_similarity = 0.0
             if ENABLE_TAG_SIMILARITY and tag_profile:
-                tag_similarity = self.calculate_tag_similarity(list(data["tags"]), tag_profile)
+                tag_similarity = self.calculate_tag_similarity(data["tags"], tag_profile)
 
             if ENABLE_TAG_SIMILARITY or ENABLE_PLAY_FREQUENCY_WEIGHTING:
                 score = (
@@ -561,7 +578,7 @@ class RecommendationEngine:
                 "avg_match": avg_match,
                 "recommended_by": data["recommended_by"],
                 "listeners": listeners,
-                "tags": list(data["tags"])[:10],
+                "tags": data["tags"][:10],  # Already a list, just slice top 10
                 "rarity_score": rarity_score,
                 "tag_similarity": tag_similarity,
                 "rarity_pref": rarity_pref

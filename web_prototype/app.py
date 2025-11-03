@@ -510,18 +510,22 @@ def generate_recommendations_stream():
         # Stream progress updates
         while True:
             try:
-                progress = progress_queue.get(timeout=30)
+                progress = progress_queue.get(timeout=10)  # Shorter timeout for more frequent heartbeats
                 if progress is None:  # Completion signal
                     break
                 yield f"data: {json.dumps(progress)}\n\n"
             except queue.Empty:
-                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                # Send heartbeat to keep connection alive
+                yield f": keepalive\n\n"
+
+        # Wait for thread to fully complete
+        thread.join(timeout=5)
 
         # Send final result
         if result_holder['success']:
             yield f"data: {json.dumps({'type': 'complete', 'data': result_holder['data']})}\n\n"
         else:
-            yield f"data: {json.dumps({'type': 'error', 'error': result_holder['error']})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': result_holder.get('error', 'Unknown error')})}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
