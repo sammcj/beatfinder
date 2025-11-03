@@ -151,6 +151,7 @@
                             max="100"
                             step="1"
                             value="{{ config.loved_play_count_threshold }}"
+                            class="w-full"
                             oninput="document.getElementById('loved-play-value').textContent = this.value"
                             hx-post="/update-artist-stats"
                             hx-trigger="input changed delay:200ms"
@@ -291,6 +292,7 @@
                         min="1"
                         max="50"
                         value="{{ config.known_artist_min_play_count }}"
+                        class="w-full"
                         oninput="document.getElementById('known-play-value').textContent = this.value"
                         hx-post="/update-artist-stats"
                         hx-trigger="input changed delay:200ms"
@@ -442,6 +444,7 @@
                         min="1"
                         max="15"
                         value="{{ config.rarity_preference }}"
+                        class="w-full"
                         hx-post="/update-weights"
                         hx-trigger="input changed delay:100ms"
                         hx-target="#weight-chart-container"
@@ -467,6 +470,7 @@
                         max="200"
                         step="10"
                         value="{{ config.max_recommendations }}"
+                        class="w-full"
                         oninput="document.getElementById('max-recs-value').textContent = this.value"
                     >
                     <div class="flex justify-between text-xs text-slate-500 mt-1">

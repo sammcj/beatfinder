@@ -1,6 +1,6 @@
 <div class="space-y-4">
     <!-- Visual Meter -->
-    <div class="relative h-8 bg-gradient-to-r from-green-200 via-yellow-200 to-red-200 rounded-full overflow-hidden">
+    <div class="relative h-8 bg-gradient-to-r from-green-200 via-blue-200 to-purple-200 rounded-full overflow-hidden">
         <div class="absolute inset-0 flex items-center justify-between px-4 text-xs font-medium text-slate-700">
             <span>Very Broad</span>
             <span>Balanced</span>
@@ -19,11 +19,11 @@
     <!-- Status Text -->
     <div class="text-center">
         <div class="text-lg font-semibold
-            {% if narrowness > 70 %}text-red-600
-            {% elif narrowness > 50 %}text-orange-600
-            {% elif narrowness > 30 %}text-yellow-600
-            {% elif narrowness > 15 %}text-green-600
-            {% else %}text-emerald-600{% endif %}">
+            {% if narrowness > 70 %}text-purple-600
+            {% elif narrowness > 50 %}text-indigo-600
+            {% elif narrowness > 30 %}text-blue-600
+            {% elif narrowness > 15 %}text-cyan-600
+            {% else %}text-green-600{% endif %}">
             {{ impact_text }}
         </div>
         <p class="text-xs text-slate-500 mt-2">
