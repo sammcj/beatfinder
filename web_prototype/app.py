@@ -199,9 +199,23 @@ def index():
         loved_artists = engine.get_loved_artists()
 
         # Only build tag profile if tag similarity is enabled (this is expensive!)
+        # Use cached recommendations to extract tag profile instead of rebuilding
         tag_profile = {}
         if config['enable_tag_similarity']:
-            tag_profile = engine.build_tag_profile(loved_artists)
+            # Try to load cached recommendations first
+            cached_recs = load_recommendations_cache(config['rarity_preference'])
+            if cached_recs:
+                # Extract unique tags from cached recommendations (fast)
+                all_tags = {}
+                for rec in cached_recs:
+                    for tag in rec.get('tags', []):
+                        all_tags[tag.lower()] = all_tags.get(tag.lower(), 0) + 1
+                # Create simplified tag profile from cached data
+                total_weight = sum(all_tags.values())
+                tag_profile = {tag: count / total_weight for tag, count in all_tags.items()}
+            else:
+                # No cache available - build from scratch (only happens once)
+                tag_profile = engine.build_tag_profile(loved_artists)
 
         # Calculate artist classifications
         known_count = sum(1 for stats in artist_stats.values()
@@ -327,12 +341,26 @@ def update_tag_profile():
     session['REC_TAG_BLACKLIST'] = blacklist
 
     try:
-        library = get_library_parser()
-        artist_stats = library.get_artist_stats()
-        lastfm = LastFmClient(LASTFM_API_KEY)
-        engine = RecommendationEngine(artist_stats, lastfm)
-        loved_artists = engine.get_loved_artists()
-        tag_profile = engine.build_tag_profile(loved_artists)
+        # Try to use cached recommendations to extract tag profile (fast)
+        config = get_current_config()
+        cached_recs = load_recommendations_cache(config['rarity_preference'])
+
+        if cached_recs:
+            # Extract tags from cached recommendations
+            all_tags = {}
+            for rec in cached_recs:
+                for tag in rec.get('tags', []):
+                    all_tags[tag.lower()] = all_tags.get(tag.lower(), 0) + 1
+            total_weight = sum(all_tags.values())
+            tag_profile = {tag: count / total_weight for tag, count in all_tags.items()}
+        else:
+            # No cache - build from scratch
+            library = get_library_parser()
+            artist_stats = library.get_artist_stats()
+            lastfm = LastFmClient(LASTFM_API_KEY)
+            engine = RecommendationEngine(artist_stats, lastfm)
+            loved_artists = engine.get_loved_artists()
+            tag_profile = engine.build_tag_profile(loved_artists)
 
         # Filter out ignored tags
         filtered_tags = {
@@ -584,6 +612,10 @@ def get_results_markdown():
                 'error': 'No recommendations found. Generate recommendations first.'
             })
 
+        # Limit to MAX_RECOMMENDATIONS for display (prevent browser freeze with 13k+ recs)
+        max_recs = config.get('max_recommendations', 100)
+        display_recs = cached_recs[:max_recs]
+
         # Get library stats
         library = get_library_parser()
         artist_stats = library.get_artist_stats()
@@ -594,7 +626,11 @@ def get_results_markdown():
         markdown = []
         markdown.append("# BeatFinder Recommendations\n")
         markdown.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        markdown.append(f"**Settings:** Rarity {config['rarity_preference']}, {len(cached_recs)} recommendations\n")
+        markdown.append(f"**Settings:** Rarity {config['rarity_preference']}\n")
+        if len(cached_recs) > max_recs:
+            markdown.append(f"**Showing:** Top {max_recs} of {len(cached_recs):,} cached recommendations\n")
+        else:
+            markdown.append(f"**Total:** {len(cached_recs)} recommendations\n")
 
         # Library statistics
         markdown.append("\n## Library Statistics\n")
@@ -625,7 +661,7 @@ def get_results_markdown():
 
         # Recommendations
         markdown.append("\n## Recommended Artists\n")
-        for i, rec in enumerate(cached_recs, 1):
+        for i, rec in enumerate(display_recs, 1):
             markdown.append(f"\n### {i}. {rec['name']}\n")
             markdown.append(f"**Score:** {rec['score']:.2f} | ")
             markdown.append(f"**Match:** {rec['match_score']:.2f} | ")

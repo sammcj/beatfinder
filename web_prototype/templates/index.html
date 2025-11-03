@@ -1240,6 +1240,21 @@
         .then(response => response.text())
         .then(html => {
             document.getElementById('preview-container').innerHTML = html;
+
+            // Check if we have cached recommendations
+            const previewDiv = document.createElement('div');
+            previewDiv.innerHTML = html;
+            const hasResults = previewDiv.querySelector('.recommendation-item');
+
+            if (hasResults) {
+                // Show success status with view results button
+                updateProcessingStatus('success', 'Cached recommendations available');
+                document.getElementById('processing-status').innerHTML += `
+                    <button onclick="showTab('results')" class="mt-2 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700">
+                        View Results
+                    </button>
+                `;
+            }
         });
     });
 </script>
