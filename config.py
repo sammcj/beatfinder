@@ -68,7 +68,7 @@ TAG_BLACKLIST_RAW = os.getenv("REC_TAG_BLACKLIST", "")
 REC_TAG_BLACKLIST = set(tag.strip().lower() for tag in TAG_BLACKLIST_RAW.split(",") if tag.strip())
 
 # Tag blacklist top N tags - only check top N tags when filtering (0 or "all" = check all tags)
-RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW = os.getenv("REC_TAG_BLACKLIST_TOP_N_TAGS", "all").strip().lower()
+RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW = os.getenv("REC_TAG_BLACKLIST_TOP_N_TAGS", "8").strip().lower()
 if RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW in ["all", "0", ""]:
     REC_TAG_BLACKLIST_TOP_N_TAGS = 0  # 0 means check all tags
 else:
@@ -77,8 +77,8 @@ else:
         if REC_TAG_BLACKLIST_TOP_N_TAGS < 0:
             REC_TAG_BLACKLIST_TOP_N_TAGS = 0
     except ValueError:
-        print(f"Warning: Invalid REC_TAG_BLACKLIST_TOP_N_TAGS value '{RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW}', using 'all'")
-        REC_TAG_BLACKLIST_TOP_N_TAGS = 0
+        print(f"Warning: Invalid REC_TAG_BLACKLIST_TOP_N_TAGS value '{RECOMMENDED_ARTISTS_TAG_BLACKLIST_TOP_N_TAGS_RAW}', using default: 8")
+        REC_TAG_BLACKLIST_TOP_N_TAGS = 8
 
 # Exclude from taste profile - artists in library that won't be used to generate recommendations
 LIBRARY_EXCLUDE_FROM_TASTE_PROFILE_RAW = os.getenv("LIB_ARTISTS_IGNORE", "")

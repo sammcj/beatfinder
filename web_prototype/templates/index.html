@@ -9,6 +9,10 @@
 <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
     <div class="flex items-center justify-between flex-wrap gap-4">
         <div class="flex items-center gap-6">
+            <div class="mr-4 pr-4 border-r border-slate-200">
+                <h1 class="text-2xl font-bold text-slate-900">BeatFinder</h1>
+                <p class="text-xs text-slate-600 mt-0.5">Discover new artists based on your Apple Music listening history</p>
+            </div>
             <div class="text-center">
                 <div class="text-2xl font-bold text-primary-600">{{ library_stats.total_artists }}</div>
                 <div class="text-xs text-slate-600">Total Artists</div>
@@ -42,8 +46,12 @@
             <button onclick="exportSettings()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50" title="Export current settings as JSON">
                 Export Settings
             </button>
-            <button onclick="importSettings()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50" title="Import settings from JSON file">
+            <button onclick="document.getElementById('import-settings-input').click()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50" title="Import settings from JSON file">
                 Import Settings
+            </button>
+            <input type="file" id="import-settings-input" accept=".json" class="hidden" onchange="importSettings(this)">
+            <button onclick="resetToDefaults()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50" title="Reset all settings to .env defaults">
+                Reset to Defaults
             </button>
             <button onclick="clearCache()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50">
                 Clear All Caches
@@ -419,6 +427,24 @@
                             {% endfor %}
                         </div>
                     </details>
+                </div>
+
+                <!-- Artist Lookup Tool -->
+                <div class="mt-4 pt-4 border-t border-slate-200">
+                    <h3 class="text-xs font-semibold text-slate-900 mb-2">🔍 Artist Lookup</h3>
+                    <p class="text-xs text-slate-500 mb-3">Check why an artist was filtered or add their tags to blacklist</p>
+
+                    <div class="flex gap-1.5 mb-3">
+                        <input type="text" id="artist-lookup-input" placeholder="Enter artist name"
+                               class="flex-1 px-2 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();checkArtist();}">
+                        <button type="button" onclick="checkArtist()"
+                                class="px-3 py-1 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
+                            Check
+                        </button>
+                    </div>
+
+                    <div id="artist-lookup-results" class="hidden"></div>
                 </div>
             </div>
         </div>
@@ -1235,8 +1261,151 @@
         });
     }
 
+    function checkArtist() {
+        const input = document.getElementById('artist-lookup-input');
+        const artistName = input.value.trim();
+        const resultsDiv = document.getElementById('artist-lookup-results');
+
+        if (!artistName) {
+            resultsDiv.innerHTML = '<p class="text-xs text-red-600">Please enter an artist name</p>';
+            resultsDiv.classList.remove('hidden');
+            return;
+        }
+
+        // Show loading state
+        resultsDiv.innerHTML = '<p class="text-xs text-slate-500">Looking up artist...</p>';
+        resultsDiv.classList.remove('hidden');
+
+        fetch('/check-artist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ artist_name: artistName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                resultsDiv.innerHTML = `<p class="text-xs text-red-600">${data.error}</p>`;
+                return;
+            }
+
+            // Build results HTML
+            let html = '<div class="p-3 bg-slate-50 rounded-lg border border-slate-200">';
+
+            // Artist name and listeners
+            html += `<div class="mb-3">`;
+            html += `<h4 class="text-sm font-semibold text-slate-900 mb-1">${data.artist_name}</h4>`;
+            html += `<p class="text-xs text-slate-600"><span class="font-medium">${data.listeners.toLocaleString()}</span> listeners on Last.fm</p>`;
+            html += `</div>`;
+
+            // Filtering status
+            if (data.filtered_by_listeners || data.filtered_by_tags) {
+                html += `<div class="mb-3 p-2 bg-red-50 border border-red-200 rounded">`;
+                html += `<p class="text-xs font-semibold text-red-700 mb-1">❌ Would be filtered:</p>`;
+                html += `<ul class="text-xs text-red-600 space-y-0.5 ml-4 list-disc">`;
+                if (data.filtered_by_listeners) {
+                    html += `<li>Exceeds ${data.max_listeners.toLocaleString()} listener limit</li>`;
+                }
+                if (data.filtered_by_tags) {
+                    const tagList = data.blacklisted_tags.map(([pos, tag]) => `${tag} (#${pos})`).join(', ');
+                    html += `<li>Has blacklisted tags: ${tagList}</li>`;
+                }
+                html += `</ul>`;
+                html += `</div>`;
+            } else {
+                html += `<div class="mb-3 p-2 bg-green-50 border border-green-200 rounded">`;
+                html += `<p class="text-xs font-semibold text-green-700">✓ Would NOT be filtered</p>`;
+                html += `</div>`;
+            }
+
+            // Tags
+            if (data.tags && data.tags.length > 0) {
+                html += `<div>`;
+                html += `<p class="text-xs font-semibold text-slate-700 mb-2">Top ${data.tags.length} tags (click to blacklist):</p>`;
+                html += `<div class="flex flex-wrap gap-1.5">`;
+
+                data.tags.forEach((tag, index) => {
+                    const isBlacklisted = data.blacklisted_tags.some(([pos, t]) => t === tag);
+                    const tagClass = isBlacklisted
+                        ? 'bg-red-100 text-red-700 border-red-300 cursor-not-allowed'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-primary-50 hover:border-primary-400 cursor-pointer';
+
+                    const isInTopN = data.top_n_tags === 0 || (index + 1) <= data.top_n_tags;
+                    const checkMark = isInTopN && !isBlacklisted ? '✓' : '';
+
+                    const onclick = isBlacklisted ? '' : `onclick="addTagToBlacklistFromLookup('${tag}')"`;
+
+                    html += `<span ${onclick} class="inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${tagClass}">`;
+                    html += `<span class="text-slate-500 mr-1">${index + 1}.</span> ${tag}`;
+                    if (isBlacklisted) {
+                        html += ` <span class="ml-1">✗</span>`;
+                    }
+                    html += `</span>`;
+                });
+
+                html += `</div>`;
+
+                if (data.top_n_tags > 0) {
+                    html += `<p class="text-xs text-slate-500 mt-2">`;
+                    html += `Note: Only top ${data.top_n_tags} tags are checked for filtering`;
+                    html += `</p>`;
+                }
+
+                html += `</div>`;
+            }
+
+            html += '</div>';
+
+            resultsDiv.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error checking artist:', error);
+            resultsDiv.innerHTML = '<p class="text-xs text-red-600">Error checking artist. Please try again.</p>';
+        });
+    }
+
+    function addTagToBlacklistFromLookup(tag) {
+        fetch('/add-tag-to-blacklist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag: tag })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update the blacklist tags array and display
+                blacklistTags = data.blacklist;
+                updateTagDisplay('blacklist');
+                updateTagInput('blacklist');
+
+                // Re-check the artist to show updated status
+                checkArtist();
+
+                // Show success message briefly
+                const resultsDiv = document.getElementById('artist-lookup-results');
+                const successMsg = document.createElement('div');
+                successMsg.className = 'mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700';
+                successMsg.textContent = `✓ Added "${tag}" to blacklist`;
+                resultsDiv.appendChild(successMsg);
+
+                setTimeout(() => successMsg.remove(), 3000);
+            } else {
+                alert(data.error || 'Failed to add tag to blacklist');
+            }
+        })
+        .catch(error => {
+            console.error('Error adding tag:', error);
+            alert('Error adding tag to blacklist');
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         updateImpactMeter();
+
+        // Initialize blacklist top N display to match slider value
+        const topNSlider = document.getElementById('blacklist-top-n-slider');
+        if (topNSlider) {
+            updateBlacklistTopN(topNSlider.value);
+        }
 
         const formData = new FormData(document.getElementById('config-form'));
         fetch('/preview-recommendations', {

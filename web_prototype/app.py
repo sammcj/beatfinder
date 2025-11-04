@@ -39,6 +39,7 @@ from config import (
     CREATE_PLAYLIST,
     HTML_VISUALISATION,
     CACHE_DIR,
+    MAX_ARTIST_LISTENERS,
 )
 from library_parser import AppleMusicLibrary
 from apple_export_parser import AppleMusicExportParser
@@ -827,6 +828,94 @@ def reset_to_defaults():
             'success': True,
             'message': 'Settings reset to defaults'
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/check-artist', methods=['POST'])
+def check_artist():
+    """Fetch artist info from Last.fm (listener count and tags)"""
+    try:
+        artist_name = request.json.get('artist_name', '').strip()
+        if not artist_name:
+            return jsonify({'success': False, 'error': 'Artist name is required'})
+
+        # Fetch from Last.fm
+        lastfm = LastFmClient(LASTFM_API_KEY)
+        info = lastfm.get_artist_info(artist_name)
+
+        if not info or info.get('listeners', 0) == 0:
+            return jsonify({
+                'success': False,
+                'error': f'Artist "{artist_name}" not found on Last.fm'
+            })
+
+        listeners = info.get('listeners', 0)
+
+        # Get top 10 tags using dedicated tags endpoint for better accuracy
+        tags = lastfm.get_artist_tags(artist_name, limit=10)
+
+        # Check against current blacklist
+        current_blacklist = set(session.get('REC_TAG_BLACKLIST', REC_TAG_BLACKLIST))
+        top_n = session.get('REC_TAG_BLACKLIST_TOP_N_TAGS', REC_TAG_BLACKLIST_TOP_N_TAGS)
+
+        # Determine filtering status
+        filtered_by_listeners = False
+        max_listeners = session.get('MAX_ARTIST_LISTENERS', MAX_ARTIST_LISTENERS)
+        if max_listeners > 0 and listeners > max_listeners:
+            filtered_by_listeners = True
+
+        filtered_by_tags = False
+        blacklisted_tags = []
+        tags_to_check = tags[:top_n] if top_n > 0 else tags
+        for i, tag in enumerate(tags_to_check, 1):
+            if tag.lower() in current_blacklist:
+                blacklisted_tags.append((i, tag))
+                filtered_by_tags = True
+
+        return jsonify({
+            'success': True,
+            'artist_name': artist_name,
+            'listeners': listeners,
+            'tags': tags,
+            'filtered_by_listeners': filtered_by_listeners,
+            'filtered_by_tags': filtered_by_tags,
+            'blacklisted_tags': blacklisted_tags,
+            'max_listeners': max_listeners,
+            'top_n_tags': top_n
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/add-tag-to-blacklist', methods=['POST'])
+def add_tag_to_blacklist():
+    """Add a tag to the blacklist"""
+    try:
+        tag = request.json.get('tag', '').strip().lower()
+        if not tag:
+            return jsonify({'success': False, 'error': 'Tag is required'})
+
+        # Get current blacklist from session
+        current_blacklist = set(session.get('REC_TAG_BLACKLIST', REC_TAG_BLACKLIST))
+
+        if tag in current_blacklist:
+            return jsonify({
+                'success': False,
+                'error': f'Tag "{tag}" is already in the blacklist'
+            })
+
+        # Add to blacklist
+        current_blacklist.add(tag)
+        session['REC_TAG_BLACKLIST'] = list(current_blacklist)
+
+        return jsonify({
+            'success': True,
+            'message': f'Added "{tag}" to blacklist',
+            'blacklist': sorted(list(current_blacklist))
+        })
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
