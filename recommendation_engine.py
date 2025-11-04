@@ -36,6 +36,7 @@ from config import (
     REC_TAG_BLACKLIST,
     REC_TAG_BLACKLIST_TOP_N_TAGS,
     LIB_TAG_IGNORE_LIST,
+    REC_ARTISTS_BLACKLIST,
     SIMILAR_ARTISTS_LIMIT,
     TAG_FETCH_LIMIT,
 )
@@ -438,6 +439,17 @@ class RecommendationEngine:
                     for sim_artist in similar:
                         name = sim_artist["name"]
                         normalised_name = self._normalise_artist_name(name)
+
+                        # Filter out blacklisted artists
+                        if REC_ARTISTS_BLACKLIST:
+                            blacklisted = False
+                            for blacklisted_artist in REC_ARTISTS_BLACKLIST:
+                                normalised_blacklist = self._normalise_artist_name(blacklisted_artist)
+                                if normalised_blacklist == normalised_name:
+                                    blacklisted = True
+                                    break
+                            if blacklisted:
+                                continue
 
                         if normalised_name in self.known_artists:
                             continue

@@ -400,6 +400,8 @@ def create_apple_music_playlist_with_scraping(
     Returns:
         Dict with 'artist_data' (mapping artist -> songs/urls)
     """
+    from config import REC_ARTISTS_BLACKLIST
+
     print(f"\nScraping Apple Music catalogue for top {songs_per_artist} songs from {limit} artists...")
     print(f"Processing in batches of {batch_size} (parallel)...\n")
 
@@ -408,6 +410,33 @@ def create_apple_music_playlist_with_scraping(
     print(f"Scraping {len(artist_names)} artists from Apple Music catalogue...\n")
     artist_data = scrape_artists_parallel(artist_names, songs_per_artist, batch_size)
     print(f"\n✓ Scraping complete\n")
+
+    # Filter out songs featuring blacklisted artists
+    if REC_ARTISTS_BLACKLIST:
+        filtered_count = 0
+        for artist_name, data in list(artist_data.items()):
+            if 'songs' not in data:
+                continue
+
+            filtered_songs = []
+            for song in data['songs']:
+                title = song.get('title', '').lower()
+
+                # Check if any blacklisted artist appears in the song title (feat., ft., with, etc.)
+                contains_blacklisted = False
+                for blacklisted_artist in REC_ARTISTS_BLACKLIST:
+                    if blacklisted_artist.lower() in title:
+                        contains_blacklisted = True
+                        filtered_count += 1
+                        break
+
+                if not contains_blacklisted:
+                    filtered_songs.append(song)
+
+            artist_data[artist_name]['songs'] = filtered_songs
+
+        if filtered_count > 0:
+            print(f"✓ Filtered {filtered_count} songs featuring blacklisted artists")
 
     total_songs = sum(len(data.get('songs', [])) for data in artist_data.values())
     print(f"✓ Found {total_songs} songs with direct Apple Music links")
