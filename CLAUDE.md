@@ -141,7 +141,7 @@ USE_APPLE_EXPORT=false  # Use iTunes Library XML (alternative)
 
 **"Disliked" Artists** (filtered from recommendations AND excluded from taste profile):
 - **Apple Music Export:** Artists with explicit "DISLIKE" in Favorites.csv AND no loved tracks
-- **iTunes Library XML:** Artists with `DISLIKED_MIN_TRACK_COUNT`+ disliked tracks AND no loved tracks
+- **iTunes Library XML:** Artists with `LIB_DISLIKED_MIN_TRACK_COUNT`+ disliked tracks AND no loved tracks
 - These artists are completely excluded: they won't be recommended, and they won't be used to generate recommendations
 - Apple Music export provides explicit dislike data from user preferences
 
@@ -217,10 +217,10 @@ All settings in `.env` (copy from `.env.example`):
 - `ENABLE_TAG_SIMILARITY`: Match genre tags to taste profile
 - `ENABLE_PLAY_FREQUENCY_WEIGHTING`: Weight by play counts
 - `LAST_MONTHS_FILTER`: Time-based filtering in months, 0=disabled
-- `TAG_SIMILARITY_IGNORE_LIST`: Comma-separated tags excluded from similarity scoring (artists with these tags can still be recommended)
-- `TAG_BLACKLIST`: Comma-separated tags that completely filter out artists (artists with any blacklisted tag will never be recommended)
-- `CREATE_APPLE_MUSIC_PLAYLIST`: Auto-create playlist
-- `GENERATE_HTML_VISUALISATION`: Generate interactive graph
+- `LIB_TAG_IGNORE_LIST`: Comma-separated tags excluded from similarity scoring (artists with these tags can still be recommended)
+- `REC_TAG_BLACKLIST`: Comma-separated tags that completely filter out artists (artists with any blacklisted tag will never be recommended)
+- `CREATE_PLAYLIST`: Auto-create playlist
+- `HTML_VISUALISATION`: Generate interactive graph
 
 ## Output Files
 
@@ -316,13 +316,13 @@ All settings in `.env` (copy from `.env.example`):
 
 ### Tag Filtering - Two Distinct Approaches
 
-**TAG_SIMILARITY_IGNORE_LIST** (scoring exclusion):
+**LIB_TAG_IGNORE_LIST** (scoring exclusion):
 - Excludes specific tags from taste profile building and similarity calculations
 - Artists with these tags can still be recommended
 - Use case: Generic/broad tags that don't help narrow down taste (e.g., "american", "female vocalists", "alternative")
 - Example: Artist tagged "electronic, pop, ambient" with "pop" in ignore list → "electronic" and "ambient" still contribute to similarity scoring
 
-**TAG_BLACKLIST** (complete filtering):
+**REC_TAG_BLACKLIST** (complete filtering):
 - Completely filters out any artist with blacklisted tags from recommendations
 - Artists are removed after similar artist collection, before scoring
 - Use case: Genres/styles you absolutely don't want (e.g., "pop", "country", "christmas")

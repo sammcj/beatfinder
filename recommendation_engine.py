@@ -17,7 +17,7 @@ import requests
 from config import (
     CACHE_DIR,
     CACHE_EXPIRY_DAYS,
-    DISLIKED_MIN_TRACK_COUNT,
+    LIB_DISLIKED_MIN_TRACK_COUNT,
     ENABLE_PLAY_FREQUENCY_WEIGHTING,
     ENABLE_TAG_SIMILARITY,
     KNOWN_ARTIST_MIN_PLAY_COUNT,
@@ -33,8 +33,8 @@ from config import (
     SCORING_MATCH_WEIGHT,
     SCORING_RARITY_WEIGHT,
     SCORING_TAG_OVERLAP_WEIGHT,
-    TAG_BLACKLIST,
-    TAG_SIMILARITY_IGNORE_LIST,
+    REC_TAG_BLACKLIST,
+    LIB_TAG_IGNORE_LIST,
 )
 
 
@@ -226,7 +226,7 @@ class RecommendationEngine:
         self.disliked_artists = set(
             self._normalise_artist_name(artist)
             for artist, stats in library_stats.items()
-            if (stats.get("disliked_track_count", 0) >= DISLIKED_MIN_TRACK_COUNT and
+            if (stats.get("disliked_track_count", 0) >= LIB_DISLIKED_MIN_TRACK_COUNT and
                 stats.get("loved_track_count", 0) == 0)
         )
 
@@ -286,7 +286,7 @@ class RecommendationEngine:
             is_loved = False
 
             # Skip disliked artists from being used as recommendation sources
-            if (stats.get("disliked_track_count", 0) >= DISLIKED_MIN_TRACK_COUNT and
+            if (stats.get("disliked_track_count", 0) >= LIB_DISLIKED_MIN_TRACK_COUNT and
                 stats.get("loved_track_count", 0) == 0):
                 continue
 
@@ -335,7 +335,7 @@ class RecommendationEngine:
 
                     for tag in tags:
                         tag_lower = tag.lower()
-                        if tag_lower in TAG_SIMILARITY_IGNORE_LIST:
+                        if tag_lower in LIB_TAG_IGNORE_LIST:
                             continue
                         tag_counts[tag_lower] += weight
                         total_tags += weight
@@ -368,7 +368,7 @@ class RecommendationEngine:
         valid_tag_count = 0
         for tag in artist_tags:
             tag_lower = tag.lower()
-            if tag_lower in TAG_SIMILARITY_IGNORE_LIST:
+            if tag_lower in LIB_TAG_IGNORE_LIST:
                 continue
             similarity += tag_profile.get(tag_lower, 0)
             valid_tag_count += 1
@@ -448,19 +448,19 @@ class RecommendationEngine:
         print(f"\nFound {len(recommendations)} potential recommendations")
 
         # Filter out artists with blacklisted tags
-        if TAG_BLACKLIST:
+        if REC_TAG_BLACKLIST:
             filtered_recommendations = {}
             filtered_count = 0
             for name, data in recommendations.items():
                 artist_tags_lower = {tag.lower() for tag in data["tags"]}
                 # Check if any artist tag matches blacklist
-                if TAG_BLACKLIST & artist_tags_lower:
+                if REC_TAG_BLACKLIST & artist_tags_lower:
                     filtered_count += 1
                     continue
                 filtered_recommendations[name] = data
 
             if filtered_count > 0:
-                print(f"Filtered {filtered_count} artist(s) with blacklisted tags: {', '.join(sorted(TAG_BLACKLIST))}")
+                print(f"Filtered {filtered_count} artist(s) with blacklisted tags: {', '.join(sorted(REC_TAG_BLACKLIST))}")
 
             recommendations = filtered_recommendations
 

@@ -382,7 +382,7 @@ def _scrape_single_artist(artist_name: str, max_songs: int) -> Dict:
         return scraper.search_artist_songs(artist_name, max_songs)
 
 
-def create_apple_music_playlist_with_scraping(
+def CREATE_PLAYLIST_with_scraping(
     recommendations: List[Dict],
     limit: int,
     songs_per_artist: int = 3,
