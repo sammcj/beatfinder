@@ -157,8 +157,8 @@ class AppleMusicScraper:
         try:
             page = self.browser.new_page()
 
-            # Navigate to Apple Music search
-            search_url = f"https://music.apple.com/us/search?term={artist_name.replace(' ', '+')}"
+            # Navigate to Apple Music search (AU region to match user's account)
+            search_url = f"https://music.apple.com/au/search?term={artist_name.replace(' ', '+')}"
             page.goto(search_url, wait_until="networkidle", timeout=30000)
             page.wait_for_timeout(3000)
 
@@ -175,36 +175,59 @@ class AppleMusicScraper:
             SIMILARITY_THRESHOLD = 0.7  # Require 70% similarity
 
             for link in artist_links:
-                # Extract artist name from link text or aria-label
-                link_text = link.inner_text().strip()
-                aria_label = link.get_attribute('aria-label')
+                try:
+                    # Extract artist name from link text or aria-label
+                    # Use evaluate to get text synchronously (more stable than inner_text)
+                    link_text = page.evaluate('(element) => element.textContent', link).strip() if link else ""
+                    aria_label = link.get_attribute('aria-label') if link else ""
 
-                # Try both text sources
-                found_name = link_text if link_text else (aria_label if aria_label else "")
+                    # Try both text sources
+                    found_name = link_text if link_text else (aria_label if aria_label else "")
 
-                if found_name:
-                    # Calculate similarity
-                    score = self._calculate_name_similarity(artist_name, found_name)
+                    if found_name:
+                        # Calculate similarity
+                        score = self._calculate_name_similarity(artist_name, found_name)
 
-                    if score > best_score:
-                        best_score = score
-                        best_match = link
+                        if score > best_score:
+                            best_score = score
+                            best_match = link
+                except Exception as e:
+                    # Element became stale or page closed - skip this link
+                    continue
 
             # Check if we found a good enough match
             if not best_match or best_score < SIMILARITY_THRESHOLD:
                 page.close()
-                found_names = [link.inner_text().strip() for link in artist_links[:3]]
+                # Safely get found names for error message
+                found_names = []
+                for link in artist_links[:3]:
+                    try:
+                        name = page.evaluate('(element) => element.textContent', link).strip()
+                        if name:
+                            found_names.append(name)
+                    except:
+                        continue
                 print(f"  ⚠ No good artist name match for '{artist_name}' (best: {best_score:.2f}, found: {found_names})")
                 return {'artist_url': None, 'songs': []}
 
             # Get URL and navigate to artist page
-            artist_url = best_match.get_attribute('href')
-            if not artist_url.startswith('http'):
-                artist_url = f"https://music.apple.com{artist_url}"
+            try:
+                artist_url = best_match.get_attribute('href')
+                if not artist_url:
+                    page.close()
+                    print(f"  ⚠ Could not get artist URL for '{artist_name}'")
+                    return {'artist_url': None, 'songs': []}
 
-            # Navigate to artist page
-            page.goto(artist_url, wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(3000)
+                if not artist_url.startswith('http'):
+                    artist_url = f"https://music.apple.com{artist_url}"
+
+                # Navigate to artist page
+                page.goto(artist_url, wait_until="networkidle", timeout=30000)
+                page.wait_for_timeout(3000)
+            except Exception as e:
+                page.close()
+                print(f"  ⚠ Failed to navigate to artist page for '{artist_name}': {e}")
+                return {'artist_url': None, 'songs': []}
 
             # Get page text and HTML to extract song titles and IDs
             page_text = page.inner_text('body')
@@ -274,13 +297,13 @@ class AppleMusicScraper:
 
                     if song_id:
                         # Create direct song URL using the ID
-                        song_url = f"music://music.apple.com/us/song/{song_id}"
-                        web_song_url = f"https://music.apple.com/us/song/{song_id}"
+                        song_url = f"music://music.apple.com/au/song/{song_id}"
+                        web_song_url = f"https://music.apple.com/au/song/{song_id}"
                     else:
                         # Fallback to search URL
                         search_query = f"{line} {artist_name}"
                         song_url = f"music://music.apple.com/search?term={search_query.replace(' ', '+')}"
-                        web_song_url = f"https://music.apple.com/us/search?term={search_query.replace(' ', '+')}"
+                        web_song_url = f"https://music.apple.com/au/search?term={search_query.replace(' ', '+')}"
 
                     songs.append({
                         'title': line,
@@ -445,5 +468,6 @@ def create_apple_music_playlist_with_scraping(
     return {
         'artist_data': artist_data
     }
+
 
 

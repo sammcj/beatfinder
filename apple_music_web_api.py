@@ -432,10 +432,10 @@ class AppleMusicWebAPI:
                     return playlist_id
 
             print(f"\nAdding {len(songs_to_add)} new songs to playlist...")
-            print(f"Using batched processing (10 songs/batch) with verification\n")
+            print(f"Using smaller batches (5 songs), 5s delays between batches, with aggressive retries\n")
 
-            # Add songs with verification
-            successful, failed = self._add_songs_with_verification(playlist_id, songs_to_add, batch_size=10)
+            # Add songs with verification and retries
+            successful, failed = self._add_songs_with_verification(playlist_id, songs_to_add, batch_size=5, max_retries=2)
 
             print(f"\n✓ Added {successful}/{len(songs_to_add)} songs successfully")
             if failed > 0:
@@ -449,18 +449,22 @@ class AppleMusicWebAPI:
         self,
         playlist_id: str,
         song_ids: List[str],
-        batch_size: int = 10
+        batch_size: int = 5,
+        max_retries: int = 2
     ) -> Tuple[int, int]:
         """
-        Add songs to playlist in small batches with verification.
+        Add songs to playlist in small batches with verification and aggressive retries.
 
-        The Apple Music Web API silently fails when overwhelmed. This adds songs
-        in small batches with delays and verification after each batch.
+        The Apple Music Web API is fundamentally unreliable. This implementation:
+        - Uses smaller batches (5 songs)
+        - Waits 5 seconds between batches for API to process
+        - Retries failed songs up to 2 times
 
         Args:
             playlist_id: Playlist ID
             song_ids: List of song IDs to add
-            batch_size: Number of songs to add per batch (default: 10)
+            batch_size: Number of songs to add per batch (default: 5)
+            max_retries: Number of times to retry failed songs (default: 2)
 
         Returns:
             Tuple of (successful_count, failed_count)
@@ -470,53 +474,72 @@ class AppleMusicWebAPI:
         if not song_ids:
             return 0, 0
 
+        songs_to_add = list(song_ids)
         total = len(song_ids)
-        total_added = 0
-        failed_songs = []
+        attempt = 1
 
-        # Process in small batches
-        num_batches = (len(song_ids) + batch_size - 1) // batch_size
+        while songs_to_add and attempt <= max_retries + 1:
+            if attempt > 1:
+                print(f"\n  ═══ Retry attempt {attempt - 1}/{max_retries} for {len(songs_to_add)} failed songs ═══")
 
-        for batch_num in range(num_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(song_ids))
-            batch = song_ids[start_idx:end_idx]
+            num_batches = (len(songs_to_add) + batch_size - 1) // batch_size
+            batch_results = []
 
-            print(f"\n  Batch {batch_num + 1}/{num_batches}: Adding {len(batch)} songs...")
+            for batch_num in range(num_batches):
+                start_idx = batch_num * batch_size
+                end_idx = min(start_idx + batch_size, len(songs_to_add))
+                batch = songs_to_add[start_idx:end_idx]
 
-            # Get current playlist state
-            before_tracks = set(self.get_playlist_tracks(playlist_id))
+                print(f"\n  Batch {batch_num + 1}/{num_batches}: Adding {len(batch)} songs...")
 
-            # Add songs in this batch
-            for i, song_id in enumerate(batch, 1):
-                self.add_song_to_playlist(playlist_id, song_id, verbose=False)
-                print(f"    [{i}/{len(batch)}] Sent song {song_id} to API", end='\r')
-                time.sleep(0.5)  # 500ms delay = 2 req/sec (very conservative)
+                # Get current playlist state
+                before_tracks = set(self.get_playlist_tracks(playlist_id))
 
-            # Wait longer for API to process
-            print(f"\n  Waiting 8 seconds for API to process batch...")
-            time.sleep(8)
+                # Add songs in this batch
+                print("")  # New line before batch
+                for i, song_id in enumerate(batch, 1):
+                    success = self.add_song_to_playlist(playlist_id, song_id, verbose=True)
+                    time.sleep(1.0)  # 1 second delay = 1 req/sec (very conservative)
 
-            # Verify which songs were added
-            after_tracks = set(self.get_playlist_tracks(playlist_id))
-            added_in_batch = after_tracks - before_tracks
-            added_count = len([sid for sid in batch if str(sid) in added_in_batch])
+                # Wait for API to process batch
+                print(f"\n  Waiting 5 seconds for API to process batch...")
+                time.sleep(5)
 
-            print(f"  ✓ Verified {added_count}/{len(batch)} songs added in this batch")
+                # Verify which songs were added
+                after_tracks = set(self.get_playlist_tracks(playlist_id))
+                added_in_batch = after_tracks - before_tracks
 
-            total_added += added_count
+                # Track which specific songs were added
+                added_songs = [sid for sid in batch if str(sid) in added_in_batch]
+                failed_in_batch = [sid for sid in batch if str(sid) not in added_in_batch]
 
-            # Track failed songs
-            for sid in batch:
-                if str(sid) not in after_tracks:
-                    failed_songs.append(sid)
+                batch_results.append({
+                    'added': added_songs,
+                    'failed': failed_in_batch
+                })
 
-        # Final stats
-        failed = len(failed_songs)
+                print(f"  ✓ Verified {len(added_songs)}/{len(batch)} songs added in this batch")
+
+            # Collect all failed songs for retry
+            songs_to_add = []
+            for result in batch_results:
+                songs_to_add.extend(result['failed'])
+
+            if not songs_to_add:
+                # All songs added successfully!
+                break
+
+            attempt += 1
+
+        # Final verification
+        final_tracks = set(self.get_playlist_tracks(playlist_id))
+        total_added = len([sid for sid in song_ids if str(sid) in final_tracks])
+        failed = total - total_added
 
         if failed > 0:
-            print(f"\n  Summary: {total_added}/{total} songs added successfully")
-            print(f"  {failed} songs could not be added (may not be available in your region)")
+            print(f"\n  ═══ Final Summary ═══")
+            print(f"  ✓ Successfully added: {total_added}/{total} songs")
+            print(f"  ✗ Failed after {max_retries + 1} attempts: {failed} songs")
 
         return total_added, failed
 

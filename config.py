@@ -88,6 +88,10 @@ LIB_ARTISTS_IGNORE = [artist.strip() for artist in LIBRARY_EXCLUDE_FROM_TASTE_PR
 RECOMMENDED_ARTISTS_BLACKLIST_RAW = os.getenv("REC_ARTISTS_BLACKLIST", "")
 REC_ARTISTS_BLACKLIST = [artist.strip() for artist in RECOMMENDED_ARTISTS_BLACKLIST_RAW.split(",") if artist.strip()]
 
+# Maximum listeners threshold - completely filter artists above this popularity level (0 = no limit)
+# Default: 1,000,000 filters out very popular/mainstream artists
+MAX_ARTIST_LISTENERS = int(os.getenv("MAX_ARTIST_LISTENERS", "1000000"))
+
 # Apple Music playlist creation
 CREATE_PLAYLIST = os.getenv("CREATE_PLAYLIST", "false").lower() == "true"
 PLAYLIST_SONGS_PER_ARTIST = int(os.getenv("PLAYLIST_SONGS_PER_ARTIST", "3"))
@@ -158,5 +162,9 @@ def show_config():
         print(f"\nBlacklisted tags{top_n_desc}: {', '.join(sorted(REC_TAG_BLACKLIST))}")
     if LIB_TAG_IGNORE_LIST:
         print(f"Similarity ignored tags (not used for scoring): {', '.join(sorted(LIB_TAG_IGNORE_LIST))}")
+
+    # Show listener count filter if enabled
+    if MAX_ARTIST_LISTENERS > 0:
+        print(f"\nMaximum listener count filter: {MAX_ARTIST_LISTENERS:,} (filters mainstream/popular artists)")
 
     print("="*60 + "\n")

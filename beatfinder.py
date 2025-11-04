@@ -866,7 +866,7 @@ def main():
         except KeyboardInterrupt:
             print("\n\nInteractive filtering cancelled. Keeping all recommendations.")
 
-    # Create Apple Music playlist if enabled (with web scraping)
+    # Create Apple Music playlist if enabled
     artist_music_data = {}
     if CREATE_PLAYLIST:
         # Sort recommendations by primary genre tag for smoother playlist listening
@@ -876,20 +876,20 @@ def main():
             key=lambda x: (x.get('tags', ['unknown'])[0] if x.get('tags') else 'unknown', -x['score'])
         )
 
+        # Get Apple Music song data using Playwright scraper
         result = create_apple_music_playlist_with_scraping(
             sorted_for_playlist,
             args.limit,
             PLAYLIST_SONGS_PER_ARTIST,
             AM_SCRAPE_BATCH_SIZE
         )
+
         artist_music_data = result.get('artist_data', {})
 
-        # Validate scraped data to ensure no known artists slipped through
-        # (e.g., when scraper found wrong artist page)
+        # Validate data - filter out any known artists
         validated_data = {}
         filtered_count = 0
         for artist_name, data in artist_music_data.items():
-            # Check if this artist (or any part of collaboration) is in library
             if not engine._contains_known_artist(artist_name):
                 validated_data[artist_name] = data
             else:
@@ -899,13 +899,12 @@ def main():
         if filtered_count > 0:
             print(f"\n✓ Filtered {filtered_count} artist(s) that matched library artists")
 
-        # Create actual Apple Music playlist using web API
+        artist_music_data = validated_data
+
+        # Create playlist using Web API
         playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE, skip_library_check=PLAYLIST_SKIP_LIBRARY_CHECK)
         if not playlist_id:
             print("Note: Could not create Apple Music playlist (tokens may need refreshing)")
-
-        # Update artist_music_data to use validated version for markdown output
-        artist_music_data = validated_data
 
     # Output results
     output_file = Path("recommendations.md")

@@ -107,7 +107,7 @@ def save_run_history(config, recommendations_count):
                 'max_recommendations': config['max_recommendations'],
                 'enable_tag_similarity': config['enable_tag_similarity'],
                 'enable_play_frequency_weighting': config['enable_play_frequency_weighting'],
-                'time_filter': session.get('time_filter', ''),
+                'time_filter': config.get('time_filter', ''),
             }
         }
 
@@ -201,8 +201,7 @@ def index():
         engine = RecommendationEngine(artist_stats, lastfm)
         loved_artists = engine.get_loved_artists()
 
-        # Only build tag profile if tag similarity is enabled (this is expensive!)
-        # Use cached recommendations to extract tag profile instead of rebuilding
+        # Build tag profile from cached recommendations only (don't trigger API calls on page load!)
         tag_profile = {}
         if config['enable_tag_similarity']:
             # Try to load cached recommendations first
@@ -216,9 +215,6 @@ def index():
                 # Create simplified tag profile from cached data
                 total_weight = sum(all_tags.values())
                 tag_profile = {tag: count / total_weight for tag, count in all_tags.items()}
-            else:
-                # No cache available - build from scratch (only happens once)
-                tag_profile = engine.build_tag_profile(loved_artists)
 
         # Calculate artist classifications
         known_count = sum(1 for stats in artist_stats.values()
@@ -344,9 +340,10 @@ def update_tag_profile():
     session['REC_TAG_BLACKLIST'] = blacklist
 
     try:
-        # Try to use cached recommendations to extract tag profile (fast)
+        # Only use cached recommendations to extract tag profile (don't trigger API calls!)
         config = get_current_config()
         cached_recs = load_recommendations_cache(config['rarity_preference'])
+        tag_profile = {}
 
         if cached_recs:
             # Extract tags from cached recommendations
@@ -356,14 +353,6 @@ def update_tag_profile():
                     all_tags[tag.lower()] = all_tags.get(tag.lower(), 0) + 1
             total_weight = sum(all_tags.values())
             tag_profile = {tag: count / total_weight for tag, count in all_tags.items()}
-        else:
-            # No cache - build from scratch
-            library = get_library_parser()
-            artist_stats = library.get_artist_stats()
-            lastfm = LastFmClient(LASTFM_API_KEY)
-            engine = RecommendationEngine(artist_stats, lastfm)
-            loved_artists = engine.get_loved_artists()
-            tag_profile = engine.build_tag_profile(loved_artists)
 
         # Filter out ignored tags
         filtered_tags = {
@@ -434,6 +423,10 @@ def generate_recommendations_stream():
     # Store in session
     session['time_filter'] = time_filter
 
+    # Get config values before entering background thread (session not accessible in threads)
+    config_snapshot = get_current_config()
+    config_snapshot['time_filter'] = time_filter
+
     def generate():
         progress_queue = queue.Queue()
         result_holder = {'success': False, 'data': None, 'error': None}
@@ -451,6 +444,7 @@ def generate_recommendations_stream():
         def run_generation():
             """Run recommendation generation in background thread"""
             try:
+                # Use config_snapshot instead of calling get_current_config() (which accesses session)
                 # Get library and create engine
                 library = get_library_parser()
                 artist_stats = library.get_artist_stats()
@@ -503,7 +497,7 @@ def generate_recommendations_stream():
                 engine = RecommendationEngine(artist_stats, lastfm, progress_callback=progress_callback)
 
                 # Generate recommendations
-                recommendations = engine.generate_recommendations(rarity_pref=config['rarity_preference'])
+                recommendations = engine.generate_recommendations(rarity_pref=config_snapshot['rarity_preference'])
 
                 if not recommendations:
                     result_holder['success'] = False
@@ -515,20 +509,20 @@ def generate_recommendations_stream():
 
                 # Save to cache
                 loved_artists = engine.get_loved_artists()
-                save_recommendations_cache(recommendations, loved_artists, config['rarity_preference'])
+                save_recommendations_cache(recommendations, loved_artists, config_snapshot['rarity_preference'])
 
                 # Save to run history
-                save_run_history(config, len(recommendations))
+                save_run_history(config_snapshot, len(recommendations))
 
                 # Create Apple Music playlist if enabled
                 playlist_created = False
                 playlist_message = None
-                if config.get('CREATE_PLAYLIST', False):
+                if config_snapshot.get('CREATE_PLAYLIST', False):
                     try:
                         progress_callback("phase", "Creating Apple Music playlist...", 0, 0)
 
                         # Use top recommendations for playlist (limited by MAX_RECOMMENDATIONS)
-                        playlist_recs = recommendations[:config['max_recommendations']]
+                        playlist_recs = recommendations[:config_snapshot['max_recommendations']]
 
                         # Scrape Apple Music for song URLs
                         result = create_apple_music_playlist_with_scraping(

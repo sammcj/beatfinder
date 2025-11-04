@@ -39,6 +39,7 @@ from config import (
     REC_ARTISTS_BLACKLIST,
     SIMILAR_ARTISTS_LIMIT,
     TAG_FETCH_LIMIT,
+    MAX_ARTIST_LISTENERS,
 )
 
 
@@ -400,6 +401,8 @@ class RecommendationEngine:
             self.progress_callback("phase", f"Analysing {len(loved_artists)} loved/frequently played artists", len(loved_artists))
         if self.disliked_artists:
             print(f"Filtering {len(self.disliked_artists)} disliked artists from recommendations")
+        if MAX_ARTIST_LISTENERS > 0:
+            print(f"Filtering artists with >{MAX_ARTIST_LISTENERS:,} listeners (mainstream/popular filter)")
 
         tag_profile = self.build_tag_profile(loved_artists)
 
@@ -449,6 +452,12 @@ class RecommendationEngine:
                                     blacklisted = True
                                     break
                             if blacklisted:
+                                continue
+
+                        # Filter out artists exceeding maximum listener threshold
+                        if MAX_ARTIST_LISTENERS > 0:
+                            listeners = sim_artist.get("listeners", 0)
+                            if listeners > MAX_ARTIST_LISTENERS:
                                 continue
 
                         if normalised_name in self.known_artists:
