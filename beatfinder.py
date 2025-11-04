@@ -22,6 +22,7 @@ from config import (
     LASTFM_API_KEY,
     MAX_RECOMMENDATIONS,
     PLAYLIST_MERGE_MODE,
+    PLAYLIST_SKIP_LIBRARY_CHECK,
     PLAYLIST_SONGS_PER_ARTIST,
     RARITY_PREFERENCE,
     USE_APPLE_EXPORT,
@@ -899,7 +900,7 @@ def main():
             print(f"\n✓ Filtered {filtered_count} artist(s) that matched library artists")
 
         # Create actual Apple Music playlist using web API
-        playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE)
+        playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE, skip_library_check=PLAYLIST_SKIP_LIBRARY_CHECK)
         if not playlist_id:
             print("Note: Could not create Apple Music playlist (tokens may need refreshing)")
 

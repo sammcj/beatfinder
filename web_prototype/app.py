@@ -50,7 +50,7 @@ from recommendation_engine import (
 )
 from apple_music_integration import create_apple_music_playlist_with_scraping
 from apple_music_web_api import create_beatfinder_playlist
-from config import PLAYLIST_SONGS_PER_ARTIST, PLAYLIST_MERGE_MODE, AM_SCRAPE_BATCH_SIZE
+from config import PLAYLIST_SONGS_PER_ARTIST, PLAYLIST_MERGE_MODE, AM_SCRAPE_BATCH_SIZE, PLAYLIST_SKIP_LIBRARY_CHECK
 from interactive_filter import (
     filter_rejected_from_recommendations,
     REJECTED_ARTISTS_FILE,
@@ -552,7 +552,7 @@ def generate_recommendations_stream():
                             total_songs = sum(len(songs.get('songs', [])) for songs in validated_data.values())
 
                             # Create actual Apple Music playlist using web API
-                            playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE)
+                            playlist_id = create_beatfinder_playlist(validated_data, merge=PLAYLIST_MERGE_MODE, skip_library_check=PLAYLIST_SKIP_LIBRARY_CHECK)
                             if playlist_id:
                                 playlist_created = True
                                 playlist_message = (

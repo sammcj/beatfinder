@@ -93,6 +93,7 @@ CREATE_PLAYLIST = os.getenv("CREATE_PLAYLIST", "false").lower() == "true"
 PLAYLIST_SONGS_PER_ARTIST = int(os.getenv("PLAYLIST_SONGS_PER_ARTIST", "3"))
 AM_SCRAPE_BATCH_SIZE = int(os.getenv("AM_SCRAPE_BATCH_SIZE", "5"))
 PLAYLIST_MERGE_MODE = os.getenv("PLAYLIST_MERGE_MODE", "true").lower() == "true"
+PLAYLIST_SKIP_LIBRARY_CHECK = os.getenv("PLAYLIST_SKIP_LIBRARY_CHECK", "false").lower() == "true"
 
 # Interactive filtering
 CLI_INTERACTIVE_FILTERING = os.getenv("CLI_INTERACTIVE_FILTERING", "true").lower() == "true"
