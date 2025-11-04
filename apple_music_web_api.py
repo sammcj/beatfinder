@@ -130,25 +130,22 @@ class AppleMusicWebAPI:
             print(f"Error fetching playlist tracks: {e}")
             return []
 
-    def check_songs_in_library(self, song_ids: List[str], return_filtered: bool = False) -> tuple:
+    def check_songs_in_library(self, song_ids: List[str]) -> List[str]:
         """
         Check which songs from a list are already in the user's library.
 
         Args:
             song_ids: List of Apple Music catalogue song IDs
-            return_filtered: If True, also return list of filtered song IDs
 
         Returns:
-            If return_filtered=False: List of song IDs that are NOT in the library
-            If return_filtered=True: Tuple of (songs_to_add, songs_filtered)
+            List of song IDs that are NOT in the library (candidates to add)
         """
         if not song_ids:
-            return ([], []) if return_filtered else []
+            return []
 
         # The API accepts up to 100 IDs at once, so batch if needed
         batch_size = 100
         not_in_library = []
-        filtered_songs = []
 
         for i in range(0, len(song_ids), batch_size):
             batch = song_ids[i:i + batch_size]
@@ -175,11 +172,9 @@ class AppleMusicWebAPI:
                         if catalogue_id:
                             library_equivalents.add(str(catalogue_id))
 
-                    # Separate songs into "to add" and "filtered"
+                    # Add songs NOT found in library
                     for song_id in batch:
-                        if str(song_id) in library_equivalents:
-                            filtered_songs.append(song_id)
-                        else:
+                        if str(song_id) not in library_equivalents:
                             not_in_library.append(song_id)
                 else:
                     # If check fails, assume none are in library (add all)
@@ -190,8 +185,6 @@ class AppleMusicWebAPI:
                 # On error, assume none are in library
                 not_in_library.extend(batch)
 
-        if return_filtered:
-            return (not_in_library, filtered_songs)
         return not_in_library
 
     def delete_playlist(self, playlist_id: str) -> bool:
@@ -354,8 +347,7 @@ class AppleMusicWebAPI:
         name: str,
         song_ids: List[str],
         description: str = "",
-        merge: bool = True,
-        song_to_artist_map: Dict[str, str] = None
+        merge: bool = True
     ) -> Optional[str]:
         """
         Create a new playlist or update an existing one with the same name.
@@ -420,30 +412,12 @@ class AppleMusicWebAPI:
 
         # Filter out songs already in library
         if song_ids:
-            import os
-            debug = os.getenv('DEBUG', 'false').lower() == 'true'
-
             print(f"\nChecking which songs are already in your library...")
-            songs_to_add, filtered = self.check_songs_in_library(song_ids, return_filtered=True)
-            already_in_library = len(filtered)
+            songs_to_add = self.check_songs_in_library(song_ids)
+            already_in_library = len(song_ids) - len(songs_to_add)
 
             if already_in_library > 0:
-                print(f"\n⚠️  WARNING: Found {already_in_library}/{len(song_ids)} songs already in library!")
-
-                # Show which artists are affected
-                if song_to_artist_map and filtered:
-                    from collections import Counter
-                    filtered_artists = [song_to_artist_map.get(song_id, 'Unknown') for song_id in filtered]
-                    artist_counts = Counter(filtered_artists)
-
-                    print(f"\nArtists with songs already in library ({len(artist_counts)} total):")
-                    for artist, count in sorted(artist_counts.items(), key=lambda x: -x[1])[:20]:
-                        print(f"  - {artist}: {count} song(s)")
-                    if len(artist_counts) > 20:
-                        print(f"  ... and {len(artist_counts) - 20} more artists")
-
-                    print(f"\n   These artists likely have <3 tracks in your library (below KNOWN_ARTIST_MIN_TRACKS threshold)")
-                    print(f"   This is expected behavior - increase threshold to 1 to filter them out.")
+                print(f"✓ Found {already_in_library} songs already in your library (will skip)")
 
             if not songs_to_add:
                 print("All songs are already in your library - nothing to add!")
@@ -455,19 +429,11 @@ class AppleMusicWebAPI:
             # Add songs in parallel
             successful, failed = self._add_songs_parallel(playlist_id, songs_to_add, max_workers=5)
 
-            # Clear, comprehensive summary
-            total_attempted = len(song_ids)
-            print(f"\n{'='*60}")
-            print(f"Playlist Summary:")
-            print(f"  ✓ Added {successful} songs successfully")
+            print(f"\n✓ Added {successful}/{len(songs_to_add)} songs successfully")
             if failed > 0:
-                print(f"  ✗ Failed {failed} songs (may not be available in your region)")
-            print(f"  Total: {total_attempted} songs from new artists")
-            print(f"{'='*60}")
-            print(f"\nNote: If songs don't appear in Apple Music immediately:")
-            print(f"  1. Force quit Apple Music (Cmd+Q)")
-            print(f"  2. Reopen Apple Music")
-            print(f"  3. Wait 1-3 minutes for sync")
+                print(f"  {failed} songs could not be added (may not be available in your region)")
+            if already_in_library > 0:
+                print(f"  {already_in_library} songs skipped (already in library)")
 
         return playlist_id
 
@@ -565,16 +531,14 @@ def create_beatfinder_playlist(artist_song_data: Dict[str, Dict], merge: bool = 
     today = datetime.now().strftime("%Y-%m-%d")
     playlist_name = f"BeatFinder - {today}"
 
-    # Collect all song IDs and track artist->song mapping for debugging
+    # Collect all song IDs
     song_ids = []
-    song_to_artist = {}  # Map song_id -> artist_name for debugging
     for artist_name, data in artist_song_data.items():
         songs = data.get('songs', [])
         for song in songs:
             song_id = song.get('id')
             if song_id:
                 song_ids.append(str(song_id))
-                song_to_artist[str(song_id)] = artist_name
 
     if not song_ids:
         print("No song IDs found to add to playlist")
@@ -589,13 +553,7 @@ def create_beatfinder_playlist(artist_song_data: Dict[str, Dict], merge: bool = 
     try:
         api = AppleMusicWebAPI()
         description = f"Artist recommendations generated by BeatFinder on {today}"
-        playlist_id = api.create_or_update_playlist(
-            playlist_name,
-            song_ids,
-            description,
-            merge=merge,
-            song_to_artist_map=song_to_artist  # Pass mapping for debug logging
-        )
+        playlist_id = api.create_or_update_playlist(playlist_name, song_ids, description, merge=merge)
 
         if playlist_id:
             action_complete = "updated" if merge else "created"
