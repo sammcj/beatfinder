@@ -322,6 +322,24 @@
                     </div>
                 </div>
 
+                <!-- Max Listener Count Filter -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-medium text-slate-700">Maximum Last.FM Listener Count</label>
+                        <span id="max-listeners-value" class="text-xs font-semibold text-red-600">{{ '{:,}'.format(config.MAX_ARTIST_LISTENERS) if config.MAX_ARTIST_LISTENERS > 0 else 'Disabled' }}</span>
+                    </div>
+                    <input
+                        type="range"
+                        name="max_artist_listeners"
+                        id="max-listeners-slider"
+                        min="0"
+                        max="5000000"
+                        step="100000"
+                        value="{{ config.MAX_ARTIST_LISTENERS }}"
+                        class="w-full"
+                        oninput="updateMaxListenersDisplay(this.value)">
+                </div>
+
                 <!-- Artist Blacklist -->
                 <div>
                     <h3 class="text-xs font-semibold text-slate-900 mb-2">Artist Blacklist</h3>
@@ -612,38 +630,8 @@
     <div class="bg-white rounded-lg shadow-sm p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-slate-900">Recommendation Results</h2>
-            <div class="flex gap-2">
-                <button onclick="exportMarkdown()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50">
-                    Export Markdown
-                </button>
-                <button onclick="copyToClipboard()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50">
-                    Copy to Clipboard
-                </button>
-                <button onclick="loadResults()" class="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700">
-                    Refresh Results
-                </button>
-            </div>
-        </div>
-
-        <div id="results-content" class="prose prose-sm max-w-none">
-            <div id="results-placeholder" class="text-center py-12 text-slate-400">
-                <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <p class="text-lg font-medium">Loading results...</p>
-            </div>
-            <div id="results-markdown" class="hidden"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Visualisation Tab Content -->
-<div id="tab-content-visualisation" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow-sm p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-slate-900">Recommendation Network</h2>
             <button onclick="loadVisualisation()" class="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700">
-                Refresh Visualisation
+                Refresh Results
             </button>
         </div>
         <div id="visualisation-container" class="w-full" style="min-height: 600px;">
@@ -831,6 +819,12 @@
         sessionStorage.setItem('tag_blacklist_top_n', value);
     }
 
+    function updateMaxListenersDisplay(value) {
+        const numValue = parseInt(value);
+        const displayValue = numValue === 0 ? 'Disabled' : numValue.toLocaleString();
+        document.getElementById('max-listeners-value').textContent = displayValue;
+    }
+
     function updateProcessingStatus(status, message, progress = null) {
         const statusDiv = document.getElementById('processing-status');
         let icon, color;
@@ -939,7 +933,6 @@
                     });
 
                     refreshRunHistory();
-                    cachedMarkdown = '';
                     break;
                 case 'error':
                     eventSource.close();
@@ -1015,79 +1008,6 @@
         });
     }
 
-    let cachedMarkdown = '';
-
-    function loadResults() {
-        const placeholder = document.getElementById('results-placeholder');
-        const markdown = document.getElementById('results-markdown');
-
-        placeholder.classList.remove('hidden');
-        markdown.classList.add('hidden');
-
-        fetch('/get-results-markdown')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    cachedMarkdown = data.markdown;
-                    markdown.innerHTML = convertMarkdownToHTML(data.markdown);
-                    placeholder.classList.add('hidden');
-                    markdown.classList.remove('hidden');
-                } else {
-                    placeholder.innerHTML = `
-                        <div class="text-center py-12 text-slate-400">
-                            <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                            </svg>
-                            <p class="text-lg font-medium">${data.error}</p>
-                        </div>`;
-                }
-            })
-            .catch(error => {
-                placeholder.innerHTML = `<div class="text-center py-12 text-red-400"><p>Error loading results: ${error.message}</p></div>`;
-            });
-    }
-
-    function convertMarkdownToHTML(markdown) {
-        let html = markdown;
-        html = html.replace(/### (.*?)(\n|$)/g, '<h3 class="text-lg font-semibold text-slate-900 mt-4 mb-2">$1</h3>');
-        html = html.replace(/## (.*?)(\n|$)/g, '<h2 class="text-xl font-bold text-slate-900 mt-6 mb-3">$1</h2>');
-        html = html.replace(/# (.*?)(\n|$)/g, '<h1 class="text-2xl font-bold text-slate-900 mb-4">$1</h1>');
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
-        html = html.replace(/^- (.*?)$/gm, '<li class="ml-4">$1</li>');
-        html = html.replace(/(<li.*<\/li>)/s, '<ul class="list-disc space-y-1 mb-4">$1</ul>');
-        html = html.replace(/\n\n/g, '</p><p class="mb-2">');
-        html = '<p class="mb-2">' + html + '</p>';
-        return html;
-    }
-
-    function exportMarkdown() {
-        if (!cachedMarkdown) {
-            alert('No results to export. Load results first.');
-            return;
-        }
-
-        const blob = new Blob([cachedMarkdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'beatfinder_recommendations.md';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    function copyToClipboard() {
-        if (!cachedMarkdown) {
-            alert('No results to copy. Load results first.');
-            return;
-        }
-
-        navigator.clipboard.writeText(cachedMarkdown)
-            .then(() => alert('Copied to clipboard!'))
-            .catch(err => alert('Failed to copy: ' + err));
-    }
-
     function loadVisualisation() {
         const placeholder = document.getElementById('visualisation-placeholder');
         const content = document.getElementById('visualisation-content');
@@ -1110,6 +1030,10 @@
                             </svg>
                             <p class="text-lg font-medium">${data.error}</p>
                             <p class="text-sm mt-2">Enable HTML_VISUALISATION in .env and regenerate recommendations</p>
+                            <button onclick="showTab('config'); window.scrollTo({top: 0, behavior: 'smooth'});"
+                                    class="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
+                                Go to Configuration
+                            </button>
                         </div>`;
                 }
             })
@@ -1188,7 +1112,7 @@
     }
 
     function loadRunSettings(runId) {
-        if (!confirm('Load settings from this run? Current settings will be replaced.')) {
+        if (!confirm('Load settings from this historical run?\n\nNote: Results and Visualisation tabs will show current cached recommendations until you regenerate with "Generate Recommendations".')) {
             return;
         }
 
@@ -1198,11 +1122,14 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Settings loaded! Reloading page...');
+                alert('Settings loaded! Page will reload.\n\nReminder: Click "Generate Recommendations" to create new recommendations with these settings.');
                 location.reload();
             } else {
                 alert('Error: ' + data.error);
             }
+        })
+        .catch(error => {
+            alert('Error loading run settings: ' + error.message);
         });
     }
 

@@ -109,6 +109,7 @@ def save_run_history(config, recommendations_count):
                 'enable_tag_similarity': config['enable_tag_similarity'],
                 'enable_play_frequency_weighting': config['enable_play_frequency_weighting'],
                 'time_filter': config.get('time_filter', ''),
+                'MAX_ARTIST_LISTENERS': config.get('MAX_ARTIST_LISTENERS', MAX_ARTIST_LISTENERS),
             }
         }
 
@@ -179,6 +180,7 @@ def get_current_config():
         'REC_TAG_BLACKLIST_TOP_N_TAGS': session.get('REC_TAG_BLACKLIST_TOP_N_TAGS', REC_TAG_BLACKLIST_TOP_N_TAGS),
         'REC_ARTISTS_BLACKLIST': session.get('REC_ARTISTS_BLACKLIST', REC_ARTISTS_BLACKLIST),
         'LIB_ARTISTS_IGNORE': session.get('LIB_ARTISTS_IGNORE', LIB_ARTISTS_IGNORE),
+        'MAX_ARTIST_LISTENERS': session.get('MAX_ARTIST_LISTENERS', MAX_ARTIST_LISTENERS),
         'CREATE_PLAYLIST': session.get('CREATE_PLAYLIST', CREATE_PLAYLIST),
         'HTML_VISUALISATION': session.get('HTML_VISUALISATION', HTML_VISUALISATION),
         'use_apple_export': USE_APPLE_EXPORT,
@@ -421,8 +423,16 @@ def generate_recommendations_stream():
     # Get time filter from request args (GET params)
     time_filter = request.args.get('time_filter', '')
 
+    # Get MAX_ARTIST_LISTENERS from form (if provided)
+    max_listeners_str = request.args.get('max_artist_listeners', str(MAX_ARTIST_LISTENERS))
+    try:
+        max_listeners = int(max_listeners_str)
+    except ValueError:
+        max_listeners = MAX_ARTIST_LISTENERS
+
     # Store in session
     session['time_filter'] = time_filter
+    session['MAX_ARTIST_LISTENERS'] = max_listeners
 
     # Get config values before entering background thread (session not accessible in threads)
     config_snapshot = get_current_config()
@@ -498,7 +508,10 @@ def generate_recommendations_stream():
                 engine = RecommendationEngine(artist_stats, lastfm, progress_callback=progress_callback)
 
                 # Generate recommendations
-                recommendations = engine.generate_recommendations(rarity_pref=config_snapshot['rarity_preference'])
+                recommendations = engine.generate_recommendations(
+                    rarity_pref=config_snapshot['rarity_preference'],
+                    max_artist_listeners=config_snapshot['MAX_ARTIST_LISTENERS']
+                )
 
                 if not recommendations:
                     result_holder['success'] = False
@@ -712,7 +725,7 @@ def get_results_markdown():
         for i, rec in enumerate(display_recs, 1):
             markdown.append(f"\n### {i}. {rec['name']}\n")
             markdown.append(f"**Score:** {rec['score']:.2f} | ")
-            markdown.append(f"**Match:** {rec['match_score']:.2f} | ")
+            markdown.append(f"**Match:** {rec['avg_match']:.2f} | ")
             markdown.append(f"**Listeners:** {rec['listeners']:,}\n")
 
             if rec.get('tags'):
@@ -739,9 +752,10 @@ def get_results_markdown():
 
 @app.route('/get-visualisation', methods=['GET'])
 def get_visualisation():
-    """Get HTML visualisation if it exists"""
+    """Get HTML visualisation if it exists, or generate it on-the-fly from cached recommendations"""
     viz_path = Path(__file__).parent.parent / 'recommendations_visualisation.html'
 
+    # Try to load existing visualisation file
     if viz_path.exists():
         with open(viz_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
@@ -749,10 +763,70 @@ def get_visualisation():
             'success': True,
             'html': html_content
         })
-    else:
+
+    # Visualisation doesn't exist - try to generate it from cached recommendations
+    try:
+        config = get_current_config()
+        cached_recs = load_recommendations_cache(config['rarity_preference'])
+
+        if not cached_recs:
+            return jsonify({
+                'success': False,
+                'error': 'No cached recommendations found. Generate recommendations first.'
+            })
+
+        # Get library data for generating visualisation
+        library = get_library_parser()
+        artist_stats = library.get_artist_stats()
+        library_stats = library.get_library_stats()
+
+        # Get loved artists
+        engine = RecommendationEngine(artist_stats, LastFmClient(LASTFM_API_KEY))
+        loved_artists = engine.get_loved_artists()
+
+        # Import the visualisation generator
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from beatfinder import HTML_VISUALISATION as generate_html_viz
+
+        # Generate visualisation (this writes to recommendations_visualisation.html)
+        max_recs = min(config.get('max_recommendations', 100), len(cached_recs))
+
+        # Prepare library stats for visualisation
+        viz_library_stats = None
+        if library_stats:
+            viz_library_stats = {
+                'total_artists': len(artist_stats),
+                'loved_artists': len(loved_artists),
+                'disliked_artists': sum(1 for artist, stats in artist_stats.items()
+                                       if stats.get('disliked', False) and artist not in loved_artists),
+                'total_plays': library_stats.get('total_plays', 0),
+                'skip_rate': library_stats.get('skip_rate', 0) * 100 if library_stats.get('skip_rate') else None,
+                'oldest_play': library_stats.get('oldest_play'),
+                'newest_play': library_stats.get('newest_play'),
+                'history_span_years': library_stats.get('history_span_days', 0) / 365.25 if library_stats.get('history_span_days') else None
+            }
+
+        success = generate_html_viz(cached_recs, loved_artists, max_recs, None, viz_library_stats)
+
+        if success and viz_path.exists():
+            with open(viz_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            return jsonify({
+                'success': True,
+                'html': html_content,
+                'generated': True  # Flag to indicate this was just generated
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to generate visualisation. Enable HTML_VISUALISATION in .env.'
+            })
+
+    except Exception as e:
         return jsonify({
             'success': False,
-            'error': 'Visualisation not found. Enable HTML_VISUALISATION and regenerate recommendations.'
+            'error': f'Error generating visualisation: {str(e)}'
         })
 
 
@@ -808,6 +882,7 @@ def load_run_settings(run_id):
         session['enable_tag_similarity'] = settings.get('enable_tag_similarity', ENABLE_TAG_SIMILARITY)
         session['enable_play_frequency_weighting'] = settings.get('enable_play_frequency_weighting', ENABLE_PLAY_FREQUENCY_WEIGHTING)
         session['time_filter'] = settings.get('time_filter', '')
+        session['MAX_ARTIST_LISTENERS'] = settings.get('MAX_ARTIST_LISTENERS', MAX_ARTIST_LISTENERS)
 
         return jsonify({
             'success': True,

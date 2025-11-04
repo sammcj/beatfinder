@@ -20,6 +20,7 @@ from config import (
     CLI_INTERACTIVE_FILTERING,
     HTML_VISUALISATION,
     LASTFM_API_KEY,
+    MAX_ARTIST_LISTENERS,
     MAX_RECOMMENDATIONS,
     PLAYLIST_MERGE_MODE,
     PLAYLIST_SKIP_LIBRARY_CHECK,
@@ -831,7 +832,10 @@ def main():
         lastfm = LastFmClient(LASTFM_API_KEY)
 
         engine = RecommendationEngine(artist_stats, lastfm)
-        recommendations = engine.generate_recommendations(rarity_pref=args.rarity)
+        recommendations = engine.generate_recommendations(
+            rarity_pref=args.rarity,
+            max_artist_listeners=MAX_ARTIST_LISTENERS
+        )
 
         if not recommendations:
             print("\nNo recommendations found. Try:")

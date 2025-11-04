@@ -393,16 +393,20 @@ class RecommendationEngine:
 
         return similarity / valid_tag_count if valid_tag_count > 0 else 0.0
 
-    def generate_recommendations(self, rarity_pref: int = 7) -> List[Dict]:
+    def generate_recommendations(self, rarity_pref: int = 7, max_artist_listeners: int = None) -> List[Dict]:
         """Generate artist recommendations"""
+        # Use provided max_artist_listeners or fall back to config default
+        if max_artist_listeners is None:
+            max_artist_listeners = MAX_ARTIST_LISTENERS
+
         loved_artists = self.get_loved_artists()
         print(f"Analysing {len(loved_artists)} loved/frequently played artists...")
         if self.progress_callback:
             self.progress_callback("phase", f"Analysing {len(loved_artists)} loved/frequently played artists", len(loved_artists))
         if self.disliked_artists:
             print(f"Filtering {len(self.disliked_artists)} disliked artists from recommendations")
-        if MAX_ARTIST_LISTENERS > 0:
-            print(f"Filtering artists with >{MAX_ARTIST_LISTENERS:,} listeners (mainstream/popular filter)")
+        if max_artist_listeners > 0:
+            print(f"Filtering artists with >{max_artist_listeners:,} listeners (mainstream/popular filter)")
 
         tag_profile = self.build_tag_profile(loved_artists)
 
@@ -455,9 +459,9 @@ class RecommendationEngine:
                                 continue
 
                         # Filter out artists exceeding maximum listener threshold
-                        if MAX_ARTIST_LISTENERS > 0:
+                        if max_artist_listeners > 0:
                             listeners = sim_artist.get("listeners", 0)
-                            if listeners > MAX_ARTIST_LISTENERS:
+                            if listeners > max_artist_listeners:
                                 continue
 
                         if normalised_name in self.known_artists:
