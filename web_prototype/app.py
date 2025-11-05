@@ -544,7 +544,7 @@ def generate_recommendations_stream():
                         else:
                             progress_callback("phase", "Creating Apple Music playlist...", 0, 0)
 
-                        # Scrape Apple Music for song URLs
+                        # Scrape Apple Music for song URLs (uses 7-day cache to avoid re-scraping)
                         result = create_apple_music_playlist_with_scraping(
                             playlist_recs,
                             limit=len(playlist_recs),
