@@ -502,8 +502,7 @@ class AppleMusicWebAPI:
                     time.sleep(1.0)  # 1 second delay = 1 req/sec (very conservative)
 
                 # Wait for API to process batch
-                print(f"\n  Waiting 5 seconds for API to process batch...")
-                time.sleep(5)
+                time.sleep(2)
 
                 # Verify which songs were added
                 after_tracks = set(self.get_playlist_tracks(playlist_id))

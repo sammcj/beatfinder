@@ -880,6 +880,12 @@ def main():
             key=lambda x: (x.get('tags', ['unknown'])[0] if x.get('tags') else 'unknown', -x['score'])
         )
 
+        # Log notice about songs per artist multiplier
+        if PLAYLIST_SONGS_PER_ARTIST > 1:
+            expected_songs = len(sorted_for_playlist) * PLAYLIST_SONGS_PER_ARTIST
+            print(f"\nNote: PLAYLIST_SONGS_PER_ARTIST={PLAYLIST_SONGS_PER_ARTIST}")
+            print(f"Playlist will contain approximately {len(sorted_for_playlist)} artists × {PLAYLIST_SONGS_PER_ARTIST} songs = ~{expected_songs} total songs\n")
+
         # Get Apple Music song data using Playwright scraper
         result = create_apple_music_playlist_with_scraping(
             sorted_for_playlist,

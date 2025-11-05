@@ -533,10 +533,16 @@ def generate_recommendations_stream():
                 playlist_message = None
                 if config_snapshot.get('CREATE_PLAYLIST', False):
                     try:
-                        progress_callback("phase", "Creating Apple Music playlist...", 0, 0)
-
                         # Use top recommendations for playlist (limited by MAX_RECOMMENDATIONS)
                         playlist_recs = recommendations[:config_snapshot['max_recommendations']]
+
+                        # Log notice about songs per artist multiplier
+                        if PLAYLIST_SONGS_PER_ARTIST > 1:
+                            expected_songs = len(playlist_recs) * PLAYLIST_SONGS_PER_ARTIST
+                            progress_callback("phase", f"Creating playlist with {len(playlist_recs)} artists × {PLAYLIST_SONGS_PER_ARTIST} songs = ~{expected_songs} total songs", 0, 0)
+                            print(f"\nNote: PLAYLIST_SONGS_PER_ARTIST={PLAYLIST_SONGS_PER_ARTIST}, so playlist will contain approximately {len(playlist_recs)} artists × {PLAYLIST_SONGS_PER_ARTIST} songs = ~{expected_songs} total songs\n")
+                        else:
+                            progress_callback("phase", "Creating Apple Music playlist...", 0, 0)
 
                         # Scrape Apple Music for song URLs
                         result = create_apple_music_playlist_with_scraping(

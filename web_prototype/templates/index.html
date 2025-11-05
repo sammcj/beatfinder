@@ -995,7 +995,7 @@
             button.textContent = 'Force Re-scan Library';
 
             if (data.success) {
-                alert(`Library scanned: ${data.artist_count} artists found`);
+                /*  alert(`Library scanned: ${data.artist_count} artists found`);  */
                 location.reload();
             } else {
                 alert(`Error: ${data.error}`);
